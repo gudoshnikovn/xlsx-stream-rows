@@ -44,6 +44,7 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Install
         run: npm ci
@@ -51,6 +52,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      # `--ignore-scripts` skips `prepublishOnly` — build is already done above.
+      # setup-node writes `_authToken=${NODE_AUTH_TOKEN}` into .npmrc which
+      # prevents OIDC from kicking in. Remove it so npm falls back to the
+      # OIDC token exchange with the Trusted Publisher.
       - name: Publish
-        run: npm publish --provenance --access public --ignore-scripts
+        run: |
+          npm config delete //registry.npmjs.org/:_authToken
+          npm publish --provenance --access public --ignore-scripts
