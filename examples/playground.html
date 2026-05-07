@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>xlsx-stream playground</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { max-width: 900px; margin: 2em auto; padding: 0 1em; line-height: 1.5; }
+      h1 { font-size: 1.4em; margin-bottom: 0; }
+      p.subtitle { color: #666; margin-top: 0.3em; }
+      .controls { display: flex; gap: 0.5em; align-items: center; margin: 1em 0;
+        flex-wrap: wrap; }
+      input[type=file] { flex: 1; min-width: 200px; }
+      input[type=number] { width: 6em; }
+      button { padding: 0.4em 1em; cursor: pointer; }
+      button:disabled { opacity: 0.5; cursor: not-allowed; }
+      pre { background: #f4f4f4; padding: 1em; border-radius: 6px;
+        overflow-x: auto; font-size: 0.9em; max-height: 400px; }
+      @media (prefers-color-scheme: dark) {
+        body { background: #1a1a1a; color: #eee; }
+        pre { background: #2a2a2a; color: #ddd; }
+        p.subtitle { color: #aaa; }
+      }
+      .stats { display: flex; gap: 1.5em; flex-wrap: wrap; font-size: 0.9em;
+        color: #666; margin: 0.5em 0; }
+      .stats span strong { color: inherit; font-family: ui-monospace, monospace; }
+      table { border-collapse: collapse; width: 100%; font-size: 0.9em; }
+      th, td { border: 1px solid #ccc; padding: 0.3em 0.6em; text-align: left;
+        vertical-align: top; }
+      th { background: #eee; }
+      @media (prefers-color-scheme: dark) {
+        th { background: #333; } th, td { border-color: #555; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>xlsx-stream playground</h1>
+    <p class="subtitle">
+      Drop an XLSX, CSV, or XLS file. The library streams rows on demand —
+      open DevTools and watch the network panel: only the bytes needed for
+      <code>maxRows</code> are fetched.
+    </p>
+
+    <div class="controls">
+      <input type="file" id="file" accept=".xlsx,.xlsm,.xls,.csv" />
+      <label>maxRows: <input type="number" id="maxRows" value="100" min="1" /></label>
+      <button id="go" disabled>Read</button>
+      <button id="cancel" disabled>Cancel</button>
+    </div>
+
+    <div class="stats">
+      <span>format: <strong id="format">—</strong></span>
+      <span>sheets: <strong id="sheets">—</strong></span>
+      <span>rows yielded: <strong id="count">0</strong></span>
+      <span>elapsed: <strong id="elapsed">0</strong> ms</span>
+    </div>
+
+    <h2 style="font-size: 1em">First rows</h2>
+    <div id="output"><em>No file loaded.</em></div>
+
+    <script type="module">
+      // Use whichever build you have locally. For published consumers:
+      //   import { openWorkbook, streamRows } from 'xlsx-stream';
+      import {
+        openWorkbook,
+        streamRows,
+      } from '../dist/index.js';
+
+      const $ = (id) => document.getElementById(id);
+      const fileInput = $('file');
+      const goBtn = $('go');
+      const cancelBtn = $('cancel');
+      const maxRowsInput = $('maxRows');
+      const formatEl = $('format');
+      const sheetsEl = $('sheets');
+      const countEl = $('count');
+      const elapsedEl = $('elapsed');
+      const output = $('output');
+
+      let currentAbort = null;
+
+      fileInput.addEventListener('change', async () => {
+        const f = fileInput.files?.[0];
+        goBtn.disabled = !f;
+        if (!f) return;
+        try {
+          const info = await openWorkbook(f);
+          formatEl.textContent = info.format;
+          sheetsEl.textContent = info.sheetNames.join(', ') || '(none)';
+        } catch (e) {
+          formatEl.textContent = 'error';
+          sheetsEl.textContent = String(e?.message ?? e);
+        }
+      });
+
+      goBtn.addEventListener('click', async () => {
+        const f = fileInput.files?.[0];
+        if (!f) return;
+        goBtn.disabled = true;
+        cancelBtn.disabled = false;
+        countEl.textContent = '0';
+        elapsedEl.textContent = '0';
+        output.innerHTML = '<em>reading…</em>';
+
+        currentAbort = new AbortController();
+        const max = Number(maxRowsInput.value) || 100;
+        const start = performance.now();
+        const rows = [];
+        let count = 0;
+
+        try {
+          for await (const row of streamRows(f, {
+            maxRows: max,
+            signal: currentAbort.signal,
+          })) {
+            rows.push(row);
+            count++;
+            if (count % 50 === 0) {
+              countEl.textContent = String(count);
+              elapsedEl.textContent = (performance.now() - start).toFixed(0);
+              await new Promise((r) => requestAnimationFrame(r));
+            }
+          }
+          countEl.textContent = String(count);
+          elapsedEl.textContent = (performance.now() - start).toFixed(0);
+          output.innerHTML = renderTable(rows);
+        } catch (e) {
+          output.innerHTML = `<pre>${escapeHtml(String(e?.stack ?? e))}</pre>`;
+        } finally {
+          goBtn.disabled = false;
+          cancelBtn.disabled = true;
+          currentAbort = null;
+        }
+      });
+
+      cancelBtn.addEventListener('click', () => {
+        currentAbort?.abort(new Error('user cancelled'));
+      });
+
+      function renderTable(rows) {
+        if (rows.length === 0) return '<em>(no rows)</em>';
+        const maxCols = Math.max(...rows.map((r) => r.length));
+        const head = `<tr>${Array.from(
+          { length: maxCols },
+          (_, i) => `<th>${columnLabel(i)}</th>`,
+        ).join('')}</tr>`;
+        const body = rows
+          .slice(0, 200) // cap rendered rows; the iterator may have read more
+          .map(
+            (r) =>
+              `<tr>${Array.from(
+                { length: maxCols },
+                (_, i) => `<td>${escapeHtml(formatCell(r[i]))}</td>`,
+              ).join('')}</tr>`,
+          )
+          .join('');
+        return `<table>${head}${body}</table>` +
+          (rows.length > 200 ? `<p>… and ${rows.length - 200} more rows</p>` : '');
+      }
+
+      function columnLabel(i) {
+        let s = '';
+        i++;
+        while (i > 0) {
+          const r = (i - 1) % 26;
+          s = String.fromCharCode(65 + r) + s;
+          i = Math.floor((i - 1) / 26);
+        }
+        return s;
+      }
+
+      function formatCell(v) {
+        if (v === null || v === undefined) return '';
+        if (v instanceof Date) return v.toISOString();
+        return String(v);
+      }
+
+      function escapeHtml(s) {
+        return s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+    </script>
+  </body>
+</html>
