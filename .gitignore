@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+*.log
+.DS_Store
+.vscode
+.idea
+
+# Internal design docs — kept locally, not published
+SPREADSHEET_STREAM_SPEC.md

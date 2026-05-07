@@ -1,0 +1,55 @@
+{
+  "name": "xlsx-stream",
+  "version": "0.0.0",
+  "description": "Zero-dependency streaming XLSX/CSV/XLS reader for the browser. Bounded memory regardless of file size.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  },
+  "keywords": [
+    "xlsx",
+    "csv",
+    "xls",
+    "spreadsheet",
+    "streaming",
+    "browser",
+    "zero-dependency"
+  ],
+  "license": "MIT",
+  "author": "gudoshnikovn <gudoshnikovna@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gudoshnikovn/xlsx-stream.git"
+  },
+  "sideEffects": false
+}
