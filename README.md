@@ -2,28 +2,44 @@
 
 Zero-dependency streaming XLSX / CSV / XLS reader for the browser. Peak memory is proportional to the data returned, not to the file size — a 1 GB workbook reads in the same memory envelope as a 1 MB one.
 
-> **Status:** early development. XLSX streaming is implemented end-to-end (`openXlsxWorkbook`, `streamXlsxRows`); CSV streaming, XLS delegation, and the unified `streamRows` / `openWorkbook` / `readRows` public API across all three formats are next.
+> **Status:** beta. All three formats (XLSX, CSV, XLS) work through the unified `openWorkbook` / `streamRows` / `readRows` API. Format is auto-detected by magic bytes with extension fallback.
 
 ## Quick start
 
 ```ts
-import { openXlsxWorkbook, streamXlsxRows } from 'xlsx-stream';
+import { openWorkbook, streamRows, readRows } from 'xlsx-stream';
 
-// List sheets without reading row data (≈ 100 KiB read regardless of file size)
-const info = await openXlsxWorkbook(file);
-console.log(info.sheetNames);
+// List sheets without reading row data
+const info = await openWorkbook(file);
+console.log(info.sheetNames, info.format); // ['Sheet1', 'Data'], 'xlsx'
 
-// Stream rows on demand. Memory peak is bounded by sharedStrings size,
-// not the file or sheet length.
-for await (const row of streamXlsxRows(file, { maxRows: 100 })) {
+// Stream rows on demand — bounded memory regardless of file size (XLSX/CSV)
+for await (const row of streamRows(file, { maxRows: 100 })) {
   console.log(row); // (string | number | boolean | Date | null)[]
 }
 
-// Cancel from the outside (user clicks "Cancel"):
+// Convenience: collect into an array
+const rows = await readRows(file, { sheetName: 'Data', maxRows: 1000 });
+
+// Cancel from the outside (user clicks "Cancel")
 const ac = new AbortController();
-for await (const row of streamXlsxRows(file, { signal: ac.signal })) {
-  if (somethingHappened) ac.abort();
+for await (const row of streamRows(file, { signal: ac.signal })) {
+  if (userCancelled) ac.abort();
 }
+```
+
+## Format support
+
+| Format | Streaming | Memory peak | Dependency |
+|--------|-----------|-------------|------------|
+| XLSX / XLSM | yes | ≈ sharedStrings size + ~5 MiB | none |
+| CSV | yes | ≈ one row + decoder window | none |
+| XLS | no (delegated) | ≈ file size, capped by `xlsMaxBytes` | optional `xlsx` peer dep |
+
+Install `xlsx` only if you need XLS support:
+
+```sh
+npm install xlsx
 ```
 
 ## Why

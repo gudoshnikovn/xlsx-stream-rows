@@ -85,3 +85,45 @@ export class SheetNotFoundError extends XlsxStreamError {
     this.sheetName = sheetName;
   }
 }
+
+/**
+ * XLS file exceeded `xlsMaxBytes`. XLS has no streaming path — the whole
+ * file must be loaded — so we cap by default to avoid OOM tab crashes.
+ */
+export class XlsFileTooLargeError extends XlsxStreamError {
+  readonly fileSize: number;
+  readonly limit: number;
+  constructor(fileSize: number, limit: number) {
+    super(
+      `XLS file is ${fileSize} bytes; exceeds xlsMaxBytes (${limit}). ` +
+        `XLS has no streaming support — set xlsMaxBytes: Infinity to ` +
+        `accept the memory cost.`,
+    );
+    this.fileSize = fileSize;
+    this.limit = limit;
+  }
+}
+
+/**
+ * The XLS adapter could not load the optional `xlsx` peer dependency.
+ *
+ * XLSX and CSV work without `xlsx`. For XLS support, install it:
+ *   npm install xlsx
+ */
+export class XlsxPackageMissingError extends XlsxStreamError {
+  constructor() {
+    super(
+      'XLS support requires the optional peer dependency "xlsx". ' +
+        'Install it with `npm install xlsx`.',
+    );
+  }
+}
+
+/** File format could not be detected (extension + magic bytes both unknown). */
+export class FormatNotSupportedError extends XlsxStreamError {
+  readonly filename: string;
+  constructor(filename: string) {
+    super(`Cannot detect format of "${filename}" — supported: .xlsx, .xlsm, .xls, .csv`);
+    this.filename = filename;
+  }
+}

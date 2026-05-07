@@ -1,0 +1,93 @@
+/**
+ * XLS adapter tests. Construct synthetic XLS files via the `xlsx` package
+ * (devDep) and read them back through our adapter — the adapter then
+ * delegates *back* to `xlsx`, which is fine for round-trip verification.
+ */
+
+import { describe, expect, it } from 'vitest';
+import * as XLSX from 'xlsx';
+
+import {
+  XlsFileTooLargeError,
+  openXlsWorkbook,
+  streamXlsRows,
+} from '../src/index.js';
+import type { Row } from '../src/types.js';
+
+function buildXls(sheets: Record<string, unknown[][]>): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  for (const [name, data] of Object.entries(sheets)) {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  }
+  const out = XLSX.write(wb, { bookType: 'xls', type: 'array' }) as ArrayBuffer;
+  return new Uint8Array(out);
+}
+
+function asXlsFile(bytes: Uint8Array, name = 'book.xls'): File {
+  return new File([bytes.slice().buffer], name);
+}
+
+async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
+  const out: T[] = [];
+  for await (const x of iter) out.push(x);
+  return out;
+}
+
+describe('openXlsWorkbook', () => {
+  it('lists sheet names from a real BIFF file', async () => {
+    const bytes = buildXls({ Alpha: [[1]], Beta: [[2]], Gamma: [[3]] });
+    const info = await openXlsWorkbook(asXlsFile(bytes));
+    expect(info.format).toBe('xls');
+    expect(info.sheetNames).toEqual(['Alpha', 'Beta', 'Gamma']);
+  });
+});
+
+describe('streamXlsRows', () => {
+  it('streams rows from the default sheet', async () => {
+    const bytes = buildXls({
+      S1: [
+        ['name', 'age', 'active'],
+        ['Alice', 30, true],
+        ['Bob', 25, false],
+      ],
+    });
+    const rows = await collect(streamXlsRows(asXlsFile(bytes)));
+    expect(rows).toEqual([
+      ['name', 'age', 'active'],
+      ['Alice', 30, true],
+      ['Bob', 25, false],
+    ]);
+  });
+
+  it('selects a sheet by name', async () => {
+    const bytes = buildXls({ A: [['from-A']], B: [['from-B']] });
+    const rows = await collect(streamXlsRows(asXlsFile(bytes), { sheetName: 'B' }));
+    expect(rows).toEqual([['from-B']]);
+  });
+
+  it('honors maxRows', async () => {
+    const data: unknown[][] = [];
+    for (let i = 0; i < 100; i++) data.push([i]);
+    const bytes = buildXls({ S1: data });
+    const rows = await collect(streamXlsRows(asXlsFile(bytes), { maxRows: 5 }));
+    expect(rows.map((r) => r[0])).toEqual([0, 1, 2, 3, 4]);
+  });
+
+  it('throws XlsFileTooLargeError when the file exceeds xlsMaxBytes', async () => {
+    const bytes = buildXls({ S1: [[1]] });
+    await expect(
+      collect(streamXlsRows(asXlsFile(bytes), { xlsMaxBytes: 100 })),
+    ).rejects.toBeInstanceOf(XlsFileTooLargeError);
+  });
+
+  it('returns Date objects for date-typed cells when parseDates=true', async () => {
+    const dt = new Date(Date.UTC(2021, 0, 1));
+    const bytes = buildXls({ S1: [[dt]] });
+    const rows: Row[] = await collect(
+      streamXlsRows(asXlsFile(bytes), { parseDates: true }),
+    );
+    expect(rows[0]?.[0]).toBeInstanceOf(Date);
+    expect((rows[0]?.[0] as Date).getUTCFullYear()).toBe(2021);
+  });
+});
