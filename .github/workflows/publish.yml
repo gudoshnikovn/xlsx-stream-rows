@@ -52,10 +52,10 @@ jobs:
       - name: Build
         run: npm run build
 
-      # setup-node writes `_authToken=${NODE_AUTH_TOKEN}` into .npmrc which
-      # prevents OIDC from kicking in. Remove it so npm falls back to the
-      # OIDC token exchange with the Trusted Publisher.
+      # `--ignore-scripts` skips `prepublishOnly` — build is already done above.
+      # NODE_AUTH_TOKEN is intentionally unset: setup-node writes
+      # `_authToken=${NODE_AUTH_TOKEN}` which expands to empty string, and npm
+      # detects the GitHub Actions OIDC environment and exchanges an OIDC token
+      # with the Trusted Publisher instead of requiring a static npm token.
       - name: Publish
-        run: |
-          npm config delete //registry.npmjs.org/:_authToken
-          npm publish --provenance --access public --ignore-scripts
+        run: npm publish --provenance --access public --ignore-scripts
