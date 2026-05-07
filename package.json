@@ -1,6 +1,6 @@
 {
   "name": "xlsx-stream-rows",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-dependency streaming XLSX/CSV/XLS reader for the browser. Bounded memory regardless of file size.",
   "type": "module",
   "main": "./dist/index.cjs",
