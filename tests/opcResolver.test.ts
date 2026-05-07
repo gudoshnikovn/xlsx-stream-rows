@@ -4,7 +4,7 @@ import {
   relsPathFor,
   resolvePackagePaths,
   resolveWorkbookPath,
-} from '../src/opcResolver.js';
+} from '../src/zip/opcResolver.js';
 
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 

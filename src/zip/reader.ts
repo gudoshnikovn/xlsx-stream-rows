@@ -18,7 +18,7 @@ import {
   NotAZipError,
   UnsupportedCompressionError,
   Zip64NotSupportedError,
-} from './errors.js';
+} from '../errors.js';
 
 // ─── Signatures (APPNOTE §4.3) ───────────────────────────────────────────────
 const SIG_EOCD = 0x06054b50;
@@ -176,10 +176,6 @@ export async function readZipEntries(file: Blob): Promise<ZipEntry[]> {
     entries.push({ filename, method, localHeaderOffset, compressedSize, uncompressedSize });
 
     pos += CD_FIXED_SIZE + fnLen + extraLen + commentLen;
-  }
-
-  if (entries.length !== totalEntries) {
-    // Soft warning would belong here in a chattier API; we trust what we parsed.
   }
 
   return entries;

@@ -18,7 +18,7 @@
  * means we don't break on those.
  */
 
-import { decodeXml } from './decodeXml.js';
+import { decodeXml } from '../utils/decodeXml.js';
 
 export interface PackagePaths {
   /** ZIP entry path of the workbook part. */
@@ -171,8 +171,6 @@ export function resolvePackagePaths(
   }
 
   // Cross-reference workbook's <sheet r:id="..."> with worksheet rels.
-  // The caller still has the workbookXml; we use it here only to discover
-  // which rIds matter so the returned map is just the sheet-relevant slice.
   const sheetByRId = new Map<string, string>();
   const sheetRefs = collectSheetRIds(workbookXml);
   for (const rId of sheetRefs) {

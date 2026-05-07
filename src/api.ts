@@ -3,10 +3,10 @@
  *
  * Format is detected by magic bytes (ZIP, OLE2) with extension as fallback.
  * Each call dispatches to the right adapter:
- *   - XLSX → `xlsxStreamReader` (true streaming)
- *   - CSV  → `csvStreamReader`  (true streaming)
- *   - XLS  → `xlsAdapter`       (delegated; loads whole file into memory,
- *                                bounded by `xlsMaxBytes`)
+ *   - XLSX → `xlsx/reader` (true streaming)
+ *   - CSV  → `csv/reader`  (true streaming)
+ *   - XLS  → `xls/adapter` (delegated; loads whole file into memory,
+ *                           bounded by `xlsMaxBytes`)
  *
  * Options that don't apply to a given format are silently ignored — e.g.
  * `parseDates` has no meaning for CSV (everything is a string), and
@@ -14,9 +14,9 @@
  */
 
 import { detectFormat, type SpreadsheetFormat } from './formatDetect.js';
-import { openXlsxWorkbook, streamXlsxRows } from './xlsxStreamReader.js';
-import { openCsvWorkbook, streamCsvRows } from './csvStreamReader.js';
-import { openXlsWorkbook, streamXlsRows } from './xlsAdapter.js';
+import { openXlsxWorkbook, streamXlsxRows } from './xlsx/reader.js';
+import { openCsvWorkbook, streamCsvRows } from './csv/reader.js';
+import { openXlsWorkbook, streamXlsRows } from './xls/adapter.js';
 import type { Row } from './types.js';
 
 export interface WorkbookInfo {

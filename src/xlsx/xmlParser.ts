@@ -10,7 +10,7 @@
  * All parsers tolerate any XML namespace prefix (e.g. `<x:sheet>`).
  */
 
-import { decodeXml } from './decodeXml.js';
+import { decodeXml } from '../utils/decodeXml.js';
 
 const PREFIX = '(?:[a-zA-Z][\\w-]*:)?';
 
@@ -59,7 +59,6 @@ const T_RE = new RegExp(
   `<${PREFIX}t\\b[^>]*>([\\s\\S]*?)</${PREFIX}t>`,
   'g',
 );
-const T_EMPTY_RE = new RegExp(`<${PREFIX}t\\b[^>]*/>`, 'g');
 
 /**
  * Parse a `<sst>` document into the ordered string table.
@@ -78,10 +77,6 @@ export function parseSharedStrings(xml: string): string[] {
     for (const tm of body.matchAll(T_RE)) {
       text += decodeXml(tm[1] ?? '');
     }
-    // Account for any self-closing <t/> placeholders so si counts stay correct
-    // when the only content is empty text. matchAll on T_EMPTY_RE produces no
-    // text but ensures we don't lose track of an "intentionally empty" si.
-    void body.matchAll(T_EMPTY_RE);
     out.push(text);
   }
   return out;

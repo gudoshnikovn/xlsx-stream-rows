@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createRowParser, type RowParserContext } from '../src/rowParser.js';
+import { createRowParser, type RowParserContext } from '../src/xlsx/rowParser.js';
 import type { Row } from '../src/types.js';
 
 const ctx = (overrides: Partial<RowParserContext> = {}): RowParserContext => ({

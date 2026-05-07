@@ -12,7 +12,7 @@
  * contains date tokens.
  */
 
-import { decodeXml } from './decodeXml.js';
+import { decodeXml } from '../utils/decodeXml.js';
 
 // ECMA-376 Part 1 §18.8.30, table of built-in number formats:
 //   14–22  date / date-time

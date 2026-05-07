@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseDateFormatMask } from '../src/xlsxStyles.js';
+import { parseDateFormatMask } from '../src/xlsx/styles.js';
 
 describe('parseDateFormatMask', () => {
   it('flags cellXfs entries that reference built-in date formats', () => {

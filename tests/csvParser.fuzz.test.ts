@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { createCsvParser } from '../src/csvParser.js';
+import { createCsvParser } from '../src/csv/parser.js';
 
 function parseInOneShot(input: string): string[][] {
   const p = createCsvParser();

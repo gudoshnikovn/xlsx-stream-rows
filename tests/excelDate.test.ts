@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { excelSerialToDate } from '../src/excelDate.js';
+import { excelSerialToDate } from '../src/utils/excelDate.js';
 
 const utc = (y: number, m: number, d: number, h = 0, mi = 0, s = 0): number =>
   Date.UTC(y, m - 1, d, h, mi, s);

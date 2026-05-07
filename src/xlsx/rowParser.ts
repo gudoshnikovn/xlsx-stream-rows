@@ -29,9 +29,9 @@
  *     arrived by then).
  */
 
-import { decodeXml } from './decodeXml.js';
-import { excelSerialToDate } from './excelDate.js';
-import type { CellValue, Row } from './types.js';
+import { decodeXml } from '../utils/decodeXml.js';
+import { excelSerialToDate } from '../utils/excelDate.js';
+import type { CellValue, Row } from '../types.js';
 
 export interface RowParserContext {
   sharedStrings: readonly string[];
@@ -56,7 +56,6 @@ const CC_QMARK = 0x3f;
 const CC_EXCL = 0x21;
 const CC_DQUOTE = 0x22;
 const CC_SQUOTE = 0x27;
-const CC_COLON = 0x3a;
 
 interface PendingCell {
   col: number;
@@ -458,6 +457,3 @@ export function createRowParser(ctx: RowParserContext): RowParser {
 
   return { push, end };
 }
-
-// ─── re-exports ──────────────────────────────────────────────────────────────
-export type { CellValue, Row } from './types.js';

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decodeXml } from '../src/decodeXml.js';
+import { decodeXml } from '../src/utils/decodeXml.js';
 
 describe('decodeXml', () => {
   it('passes through strings without entities (fast path)', () => {

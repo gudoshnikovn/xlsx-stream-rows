@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { openCsvWorkbook, streamCsvRows } from '../src/csvStreamReader.js';
+import { openCsvWorkbook, streamCsvRows } from '../src/csv/reader.js';
 import type { Row } from '../src/types.js';
 
 const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);

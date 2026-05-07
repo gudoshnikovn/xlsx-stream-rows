@@ -4,7 +4,7 @@ import {
   extractSheetNames,
   parseSharedStrings,
   parseSheets,
-} from '../src/xlsxXmlParser.js';
+} from '../src/xlsx/xmlParser.js';
 
 describe('parseSheets / extractSheetNames', () => {
   it('parses a flat workbook with three sheets', () => {

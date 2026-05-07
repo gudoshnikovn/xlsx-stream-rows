@@ -25,23 +25,24 @@ import {
   InvalidOpcPackageError,
   SharedStringsTooLargeError,
   SheetNotFoundError,
-} from './errors.js';
+} from '../errors.js';
 import {
   type ZipEntry,
   openDecompressedStream,
   readEntryToString,
   readZipEntries,
-} from './zipReader.js';
+} from '../zip/reader.js';
 import {
   type PackagePaths,
   relsPathFor,
   resolvePackagePaths,
   resolveWorkbookPath,
-} from './opcResolver.js';
-import { parseSharedStrings, parseSheets } from './xlsxXmlParser.js';
-import { parseDateFormatMask } from './xlsxStyles.js';
+} from '../zip/opcResolver.js';
+import { parseSharedStrings, parseSheets } from './xmlParser.js';
+import { parseDateFormatMask } from './styles.js';
 import { createRowParser } from './rowParser.js';
-import type { Row } from './types.js';
+import { checkAbort, abortable } from '../utils/abort.js';
+import type { Row } from '../types.js';
 
 const ROOT_RELS_PATH = '_rels/.rels';
 const DEFAULT_SHARED_STRINGS_MAX = 64 * 1024 * 1024; // 64 MiB
@@ -77,43 +78,6 @@ function resolveOptions(o: XlsxStreamOptions | undefined): ResolvedOptions {
     sharedStringsMaxBytes: o?.sharedStringsMaxBytes ?? DEFAULT_SHARED_STRINGS_MAX,
     signal: o?.signal,
   };
-}
-
-function checkAbort(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) {
-    throw signal.reason ?? new DOMException('Aborted', 'AbortError');
-  }
-}
-
-/**
- * Race a promise against an AbortSignal. Resolves with the promise's value;
- * rejects with `signal.reason` if the signal aborts first.
- *
- * Used so that long-running reads (sharedStrings fetch, sheet stream pulls)
- * can be aborted promptly even if the underlying I/O doesn't yet support
- * native AbortSignal.
- */
-function abortable<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
-  if (signal === undefined) return promise;
-  if (signal.aborted) {
-    return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => {
-      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
-    promise.then(
-      (v) => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(v);
-      },
-      (e) => {
-        signal.removeEventListener('abort', onAbort);
-        reject(e);
-      },
-    );
-  });
 }
 
 interface Resolved {
@@ -271,7 +235,7 @@ async function* streamXlsxRowsImpl(
   const stream = await abortable(openDecompressedStream(file, sheetEntry), signal);
   // DOM lib types TextDecoderStream's writable as WritableStream<BufferSource>
   // but pipeThrough expects matching <Uint8Array, …> — same shim used in
-  // zipReader.ts. The runtime contract is identical.
+  // zip/reader.ts. The runtime contract is identical.
   const td = new TextDecoderStream('utf-8') as unknown as ReadableWritablePair<
     string,
     Uint8Array

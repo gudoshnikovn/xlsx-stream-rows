@@ -19,8 +19,8 @@ import {
   XlsFileTooLargeError,
   XlsxPackageMissingError,
   SheetNotFoundError,
-} from './errors.js';
-import type { CellValue, Row } from './types.js';
+} from '../errors.js';
+import type { CellValue, Row } from '../types.js';
 
 export interface XlsStreamOptions {
   maxRows?: number;
@@ -96,7 +96,12 @@ async function loadXlsx(): Promise<XlsxModule> {
   }
 }
 
-async function loadWorkbook(file: Blob, opts: ResolvedXlsOptions): Promise<XlsxWorkbook> {
+interface LoadedWorkbook {
+  wb: XlsxWorkbook;
+  xlsx: XlsxModule;
+}
+
+async function loadWorkbook(file: Blob, opts: ResolvedXlsOptions): Promise<LoadedWorkbook> {
   if (file.size > opts.xlsMaxBytes) {
     throw new XlsFileTooLargeError(file.size, opts.xlsMaxBytes);
   }
@@ -105,12 +110,12 @@ async function loadWorkbook(file: Blob, opts: ResolvedXlsOptions): Promise<XlsxW
   checkAbort(opts.signal);
   const buf = await file.arrayBuffer();
   checkAbort(opts.signal);
-  return xlsx.read(buf, { type: 'array', cellDates: opts.parseDates });
+  return { wb: xlsx.read(buf, { type: 'array', cellDates: opts.parseDates }), xlsx };
 }
 
 export async function openXlsWorkbook(file: File): Promise<XlsWorkbookInfo> {
   const opts = resolveOptions(undefined);
-  const wb = await loadWorkbook(file, opts);
+  const { wb } = await loadWorkbook(file, opts);
   return { filename: file.name, sheetNames: [...wb.SheetNames], format: 'xls' };
 }
 
@@ -128,8 +133,7 @@ async function* streamXlsRowsImpl(
   opts: ResolvedXlsOptions,
 ): AsyncGenerator<Row, void, unknown> {
   const { signal } = opts;
-  const xlsx = await loadXlsx();
-  const wb = await loadWorkbook(file, opts);
+  const { wb, xlsx } = await loadWorkbook(file, opts);
 
   const sheetName = opts.sheetName ?? wb.SheetNames[0];
   if (sheetName === undefined) {

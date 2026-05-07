@@ -38,21 +38,21 @@ export {
   openXlsxWorkbook,
   streamXlsxRows,
   type XlsxStreamOptions,
-} from './xlsxStreamReader.js';
+} from './xlsx/reader.js';
 
 export {
   openCsvWorkbook,
   streamCsvRows,
   type CsvStreamOptions,
   type CsvWorkbookInfo,
-} from './csvStreamReader.js';
+} from './csv/reader.js';
 
 export {
   openXlsWorkbook,
   streamXlsRows,
   type XlsStreamOptions,
   type XlsWorkbookInfo,
-} from './xlsAdapter.js';
+} from './xls/adapter.js';
 
 // ─── Lower-level building blocks ─────────────────────────────────────────────
 // Exported so power users can compose their own pipelines (e.g. read raw ZIP
@@ -64,26 +64,26 @@ export {
   openDecompressedStream,
   readEntryToString,
   type ZipEntry,
-} from './zipReader.js';
+} from './zip/reader.js';
 
-export { decodeXml } from './decodeXml.js';
-export { excelSerialToDate } from './excelDate.js';
-export { parseDateFormatMask } from './xlsxStyles.js';
+export { decodeXml } from './utils/decodeXml.js';
+export { excelSerialToDate } from './utils/excelDate.js';
+export { parseDateFormatMask } from './xlsx/styles.js';
 export {
   parseSheets,
   extractSheetNames,
   parseSharedStrings,
   type WorkbookSheet,
-} from './xlsxXmlParser.js';
+} from './xlsx/xmlParser.js';
 export {
   createRowParser,
   type RowParser,
   type RowParserContext,
-} from './rowParser.js';
-export { createCsvParser, type CsvParser } from './csvParser.js';
+} from './xlsx/rowParser.js';
+export { createCsvParser, type CsvParser } from './csv/parser.js';
 export {
   resolvePackagePaths,
   resolveWorkbookPath,
   relsPathFor,
   type PackagePaths,
-} from './opcResolver.js';
+} from './zip/opcResolver.js';

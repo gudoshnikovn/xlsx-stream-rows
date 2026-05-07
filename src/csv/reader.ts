@@ -7,8 +7,9 @@
  * bytes lazily. A 1 GB CSV reads in the same memory envelope as a 1 KB one.
  */
 
-import { createCsvParser } from './csvParser.js';
-import type { CellValue, Row } from './types.js';
+import { createCsvParser } from './parser.js';
+import { checkAbort, abortable } from '../utils/abort.js';
+import type { Row } from '../types.js';
 
 export interface CsvStreamOptions {
   /** Stop after yielding this many rows. */
@@ -39,35 +40,6 @@ function resolveOptions(o: CsvStreamOptions | undefined): ResolvedCsvOptions {
     encoding: o?.encoding ?? 'utf-8',
     signal: o?.signal,
   };
-}
-
-function checkAbort(signal: AbortSignal | undefined): void {
-  if (signal?.aborted) {
-    throw signal.reason ?? new DOMException('Aborted', 'AbortError');
-  }
-}
-
-function abortable<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
-  if (signal === undefined) return promise;
-  if (signal.aborted) {
-    return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-  }
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => {
-      reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
-    promise.then(
-      (v) => {
-        signal.removeEventListener('abort', onAbort);
-        resolve(v);
-      },
-      (e) => {
-        signal.removeEventListener('abort', onAbort);
-        reject(e);
-      },
-    );
-  });
 }
 
 interface BomDetect {
@@ -147,7 +119,7 @@ async function* streamCsvRowsImpl(
       const { done, value } = await abortable(reader.read(), signal);
       if (done) {
         for (const row of parser.end()) {
-          yield row as CellValue[];
+          yield row as Row;
           yielded++;
           if (yielded >= opts.maxRows) return;
           checkAbort(signal);
@@ -155,7 +127,7 @@ async function* streamCsvRowsImpl(
         return;
       }
       for (const row of parser.push(value)) {
-        yield row as CellValue[];
+        yield row as Row;
         yielded++;
         if (yielded >= opts.maxRows) return;
         checkAbort(signal);
