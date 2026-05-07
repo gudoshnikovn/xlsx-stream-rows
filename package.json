@@ -1,5 +1,5 @@
 {
-  "name": "xlsx-stream-reader",
+  "name": "xlsx-stream-rows",
   "version": "1.0.0",
   "description": "Zero-dependency streaming XLSX/CSV/XLS reader for the browser. Bounded memory regardless of file size.",
   "type": "module",
@@ -82,7 +82,7 @@
   "author": "gudoshnikovn <gudoshnikovna@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gudoshnikovn/xlsx-stream-reader.git"
+    "url": "git+https://github.com/gudoshnikovn/xlsx-stream-rows.git"
   },
   "sideEffects": false
 }

@@ -1,18 +1,18 @@
-# xlsx-stream-reader
+# xlsx-stream-rows
 
 **Streaming, chunked, low-memory spreadsheet reader for the browser.** Reads XLSX, CSV, and XLS files row-by-row without loading the entire file into memory — a 1 GB workbook reads in roughly the same memory envelope as a 1 MB one.
 
 Zero runtime dependencies. TypeScript. ESM + CJS. Works in browsers and Web Workers.
 
 ```sh
-npm install xlsx-stream-reader
+npm install xlsx-stream-rows
 ```
 
 ---
 
 ## Why
 
-Most browser-side spreadsheet libraries materialise the entire file before yielding a single row. A 300 MB XLSX usually peaks at 1–2 GB of JS heap and crashes the tab. `xlsx-stream-reader` treats `File` as a handle, not a byte array: it reads only the ZIP Central Directory at the end of the archive, then pipes the target sheet through `DecompressionStream` into an incremental SAX parser, **emitting rows lazily, on demand**.
+Most browser-side spreadsheet libraries materialise the entire file before yielding a single row. A 300 MB XLSX usually peaks at 1–2 GB of JS heap and crashes the tab. `xlsx-stream-rows` treats `File` as a handle, not a byte array: it reads only the ZIP Central Directory at the end of the archive, then pipes the target sheet through `DecompressionStream` into an incremental SAX parser, **emitting rows lazily, on demand**.
 
 If you've been searching for terms like _streaming xlsx parser_, _chunked spreadsheet reader_, _lazy xlsx_, _partial xlsx parsing_, _incremental xlsx reader_, _async iterator over xlsx rows_, _row-by-row xlsx_, _on-demand spreadsheet loading_, _memory-bounded xlsx_, or _read large xlsx in browser without OOM_ — that's what this library does.
 
@@ -36,7 +36,7 @@ If you've been searching for terms like _streaming xlsx parser_, _chunked spread
 ## Quick start
 
 ```ts
-import { openWorkbook, streamRows, readRows } from 'xlsx-stream-reader';
+import { openWorkbook, streamRows, readRows } from 'xlsx-stream-rows';
 
 // 1. List sheets without reading row data (≈ 100 KiB read regardless of file size).
 const info = await openWorkbook(file);
@@ -110,7 +110,7 @@ The library has no DOM dependencies, so move heavy spreadsheet imports off the m
 
 ```ts
 // worker.ts
-import { streamRows } from 'xlsx-stream-reader';
+import { streamRows } from 'xlsx-stream-rows';
 
 self.onmessage = async (e: MessageEvent<File>) => {
   const file = e.data;
@@ -269,8 +269,8 @@ For XLS: no streaming primitive exists in the BIFF/OLE2 format, so we delegate t
 The repo includes a self-contained playground:
 
 ```sh
-git clone https://github.com/gudoshnikovn/xlsx-stream-reader
-cd xlsx-stream-reader
+git clone https://github.com/gudoshnikovn/xlsx-stream-rows
+cd xlsx-stream-rows
 npm install && npm run build
 npx serve .   # or any static server
 # open http://localhost:3000/examples/playground.html

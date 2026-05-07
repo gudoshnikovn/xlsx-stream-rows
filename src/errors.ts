@@ -1,5 +1,5 @@
 /**
- * Error hierarchy for xlsx-stream-reader.
+ * Error hierarchy for xlsx-stream-rows.
  *
  * All errors thrown by the library inherit from `XlsxStreamError` so that
  * callers can catch the family with a single `instanceof` check.
