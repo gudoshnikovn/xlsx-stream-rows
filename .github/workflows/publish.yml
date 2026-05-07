@@ -31,9 +31,6 @@ jobs:
     needs: test
     permissions:
       contents: read
-      # Required for npm provenance via OIDC (trusted publishing).
-      # No NPM_TOKEN needed once the package is configured as a Trusted
-      # Publisher on npmjs.com (Settings → Trusted Publishers).
       id-token: write
 
     steps:
@@ -43,8 +40,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
+
+      # Trusted Publishers require npm >=11.5.1; Node 22 ships with npm 10.x.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
 
       - name: Install
         run: npm ci
@@ -52,10 +52,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      # `--ignore-scripts` skips `prepublishOnly` — build is already done above.
-      # NODE_AUTH_TOKEN is intentionally unset: setup-node writes
-      # `_authToken=${NODE_AUTH_TOKEN}` which expands to empty string, and npm
-      # detects the GitHub Actions OIDC environment and exchanges an OIDC token
-      # with the Trusted Publisher instead of requiring a static npm token.
       - name: Publish
         run: npm publish --provenance --access public --ignore-scripts
