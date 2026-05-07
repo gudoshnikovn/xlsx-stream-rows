@@ -36,15 +36,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 24 ships with npm 11.x — required for Trusted Publishers (>=11.5.1).
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
-      # Trusted Publishers require npm >=11.5.1; Node 22 ships with npm 10.x.
-      - name: Upgrade npm
-        run: npm install -g npm@latest
 
       - name: Install
         run: npm ci
