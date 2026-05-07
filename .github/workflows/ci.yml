@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -18,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node ${{ matrix.node }}
+      - name: Setup Node.js ${{ matrix.node }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -58,8 +59,8 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Install Playwright ${{ matrix.browser }}
+      - name: Install Playwright browser
         run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Tests in ${{ matrix.browser }}
-        run: npm run test:browser -- --browser.name=${{ matrix.browser }}
+        run: npx vitest run --config vitest.browser.config.ts --browser.name=${{ matrix.browser }}
