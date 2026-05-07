@@ -2,7 +2,29 @@
 
 Zero-dependency streaming XLSX / CSV / XLS reader for the browser. Peak memory is proportional to the data returned, not to the file size — a 1 GB workbook reads in the same memory envelope as a 1 MB one.
 
-> **Status:** early development. The ZIP layer (Phase 1) is implemented; XLSX parsing, CSV streaming, and the public `streamRows` / `openWorkbook` / `readRows` API are in progress.
+> **Status:** early development. XLSX streaming is implemented end-to-end (`openXlsxWorkbook`, `streamXlsxRows`); CSV streaming, XLS delegation, and the unified `streamRows` / `openWorkbook` / `readRows` public API across all three formats are next.
+
+## Quick start
+
+```ts
+import { openXlsxWorkbook, streamXlsxRows } from 'xlsx-stream';
+
+// List sheets without reading row data (≈ 100 KiB read regardless of file size)
+const info = await openXlsxWorkbook(file);
+console.log(info.sheetNames);
+
+// Stream rows on demand. Memory peak is bounded by sharedStrings size,
+// not the file or sheet length.
+for await (const row of streamXlsxRows(file, { maxRows: 100 })) {
+  console.log(row); // (string | number | boolean | Date | null)[]
+}
+
+// Cancel from the outside (user clicks "Cancel"):
+const ac = new AbortController();
+for await (const row of streamXlsxRows(file, { signal: ac.signal })) {
+  if (somethingHappened) ac.abort();
+}
+```
 
 ## Why
 

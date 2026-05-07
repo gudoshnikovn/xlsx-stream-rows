@@ -18,7 +18,24 @@ export {
   InvalidLocalHeaderError,
   UnsupportedCompressionError,
   EntryTooLargeError,
+  InvalidOpcPackageError,
+  SharedStringsTooLargeError,
+  SheetNotFoundError,
 } from './errors.js';
+
+export {
+  resolvePackagePaths,
+  resolveWorkbookPath,
+  relsPathFor,
+  type PackagePaths,
+} from './opcResolver.js';
+
+export {
+  openXlsxWorkbook,
+  streamXlsxRows,
+  type WorkbookInfo,
+  type XlsxStreamOptions,
+} from './xlsxStreamReader.js';
 
 export { decodeXml } from './decodeXml.js';
 export { excelSerialToDate } from './excelDate.js';

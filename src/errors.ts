@@ -48,3 +48,40 @@ export class EntryTooLargeError extends XlsxStreamError {
     this.limit = limit;
   }
 }
+
+/**
+ * The OPC package is structurally invalid: missing `_rels/.rels`, no
+ * `officeDocument` relationship, or a referenced part that the ZIP does
+ * not contain. Almost always means the file is not actually an XLSX.
+ */
+export class InvalidOpcPackageError extends XlsxStreamError {}
+
+/**
+ * `xl/sharedStrings.xml` (uncompressed) exceeds `sharedStringsMaxBytes`.
+ *
+ * Pathological workbooks with millions of unique strings are rare but
+ * possible; raising the limit trades the streaming memory guarantee.
+ */
+export class SharedStringsTooLargeError extends XlsxStreamError {
+  readonly uncompressedSize: number;
+  readonly limit: number;
+  constructor(uncompressedSize: number, limit: number) {
+    super(
+      `sharedStrings.xml is ${uncompressedSize} bytes uncompressed, ` +
+        `exceeds sharedStringsMaxBytes (${limit}). Raise the option ` +
+        `or ask the producer to use inline strings.`,
+    );
+    this.uncompressedSize = uncompressedSize;
+    this.limit = limit;
+  }
+}
+
+/** The requested `sheetName` was not found in `xl/workbook.xml`. */
+export class SheetNotFoundError extends XlsxStreamError {
+  readonly sheetName: string;
+  constructor(sheetName: string, available?: readonly string[]) {
+    const list = available && available.length > 0 ? ` (available: ${available.join(', ')})` : '';
+    super(`Sheet "${sheetName}" not found in workbook${list}`);
+    this.sheetName = sheetName;
+  }
+}
