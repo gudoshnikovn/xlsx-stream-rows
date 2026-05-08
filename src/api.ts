@@ -48,14 +48,25 @@ export interface ReadOptions {
   signal?: AbortSignal;
 }
 
+/** Options accepted by `openWorkbook`. */
+export interface OpenWorkbookOptions {
+  /** XLS-only: cap on the file size loaded into memory. Default 50 MiB. */
+  xlsMaxBytes?: number;
+  /** Cancel the operation. */
+  signal?: AbortSignal;
+}
+
 /**
  * List sheet names without reading any row data.
  *
  * - XLSX: ~100 KiB read (Central Directory + workbook.xml).
  * - CSV : zero I/O — returns one pseudo-sheet named after the file.
- * - XLS : full file load (bounded by the default 50 MiB cap).
+ * - XLS : full file load (bounded by `xlsMaxBytes`, default 50 MiB).
  */
-export async function openWorkbook(file: File): Promise<WorkbookInfo> {
+export async function openWorkbook(
+  file: File,
+  options?: OpenWorkbookOptions,
+): Promise<WorkbookInfo> {
   const format = await detectFormat(file);
   switch (format) {
     case 'xlsx':
@@ -63,7 +74,7 @@ export async function openWorkbook(file: File): Promise<WorkbookInfo> {
     case 'csv':
       return openCsvWorkbook(file);
     case 'xls':
-      return openXlsWorkbook(file);
+      return openXlsWorkbook(file, options);
   }
 }
 

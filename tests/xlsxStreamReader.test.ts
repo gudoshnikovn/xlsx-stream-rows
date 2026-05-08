@@ -265,3 +265,58 @@ describe('streamXlsxRows — sharedStrings cap', () => {
     ).rejects.toBeInstanceOf(SharedStringsTooLargeError);
   });
 });
+
+describe('streamXlsxRows — lazy sharedStrings with maxRows', () => {
+  function sharedStringSheet(count: number): string {
+    let body = '<sheetData>';
+    for (let i = 0; i < count; i++) {
+      body += `<row r="${i + 1}"><c r="A${i + 1}" t="s"><v>${i}</v></c></row>`;
+    }
+    return body + '</sheetData>';
+  }
+
+  it('resolves shared strings correctly when using maxRows', async () => {
+    const strings = Array.from({ length: 100 }, (_, i) => `item-${i}`);
+    const xlsx = await buildXlsx({
+      sharedStrings: strings,
+      sheets: [{ name: 'S', sheetData: sharedStringSheet(100) }],
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx), { maxRows: 3 }));
+    expect(rows).toEqual([['item-0'], ['item-1'], ['item-2']]);
+  });
+
+  it('resolves sparse shared-string indices when using maxRows', async () => {
+    // Row 1 → index 0, row 2 → index 99: both must resolve despite index gap.
+    const strings = ['first', ...Array<string>(98).fill('filler'), 'last'];
+    const sheetData = `<sheetData>
+      <row r="1"><c r="A1" t="s"><v>0</v></c></row>
+      <row r="2"><c r="A2" t="s"><v>99</v></c></row>
+      <row r="3"><c r="A3" t="s"><v>50</v></c></row>
+    </sheetData>`;
+    const xlsx = await buildXlsx({
+      sharedStrings: strings,
+      sheets: [{ name: 'S', sheetData }],
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx), { maxRows: 2 }));
+    expect(rows).toEqual([['first'], ['last']]);
+  });
+
+  it('handles mixed shared-string and inline cells with maxRows', async () => {
+    const sheetData = `<sheetData>
+      <row r="1">
+        <c r="A1" t="s"><v>0</v></c>
+        <c r="B1"><v>42</v></c>
+      </row>
+      <row r="2">
+        <c r="A2" t="s"><v>1</v></c>
+        <c r="B2"><v>7</v></c>
+      </row>
+    </sheetData>`;
+    const xlsx = await buildXlsx({
+      sharedStrings: ['Alice', 'Bob'],
+      sheets: [{ name: 'S', sheetData }],
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx), { maxRows: 1 }));
+    expect(rows).toEqual([['Alice', 42]]);
+  });
+});

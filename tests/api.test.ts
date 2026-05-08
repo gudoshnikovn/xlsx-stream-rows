@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 
 import {
-  FormatNotSupportedError,
   detectFormat,
   openWorkbook,
   readRows,
@@ -48,10 +47,12 @@ describe('detectFormat', () => {
     expect(await detectFormat(asNamedFile(new Uint8Array(0), 'empty.xlsx'))).toBe('xlsx');
   });
 
-  it('throws FormatNotSupportedError for unknown extensions and no magic', async () => {
-    await expect(detectFormat(asNamedFile(utf8('x'), 'mystery.dat'))).rejects.toBeInstanceOf(
-      FormatNotSupportedError,
-    );
+  it('falls back to csv for unknown extensions and no magic', async () => {
+    expect(await detectFormat(asNamedFile(utf8('x'), 'mystery.dat'))).toBe('csv');
+  });
+
+  it('falls back to csv for files without any extension', async () => {
+    expect(await detectFormat(asNamedFile(utf8('a,b\n1,2'), 'Прайс'))).toBe('csv');
   });
 });
 
@@ -121,6 +122,14 @@ describe('streamRows / readRows', () => {
     const csv = utf8(Array.from({ length: 50 }, (_, i) => i).join('\n'));
     const rows = await readRows(asNamedFile(csv, 'big.csv'), { maxRows: 3 });
     expect(rows.map((r) => r[0])).toEqual(['0', '1', '2']);
+  });
+
+  it('reads a csv file with no extension via csv fallback', async () => {
+    const rows = await readRows(asNamedFile(utf8('name,price\nApple,1.5\n'), 'Прайс'));
+    expect(rows).toEqual([
+      ['name', 'price'],
+      ['Apple', '1.5'],
+    ]);
   });
 
   it('aborts before the first row when the signal is already aborted', async () => {

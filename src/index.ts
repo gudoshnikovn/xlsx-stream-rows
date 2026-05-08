@@ -7,6 +7,7 @@ export {
   readRows,
   type WorkbookInfo,
   type ReadOptions,
+  type OpenWorkbookOptions,
 } from './api.js';
 
 export { detectFormat, type SpreadsheetFormat } from './formatDetect.js';
@@ -51,6 +52,7 @@ export {
   openXlsWorkbook,
   streamXlsRows,
   type XlsStreamOptions,
+  type XlsOpenOptions,
   type XlsWorkbookInfo,
 } from './xls/adapter.js';
 

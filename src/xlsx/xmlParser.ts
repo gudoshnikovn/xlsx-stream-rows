@@ -82,6 +82,20 @@ export function parseSharedStrings(xml: string): string[] {
   return out;
 }
 
+/**
+ * Parse the body of a single `<si>` element (content between the opening and
+ * closing tags, not including the tags themselves) into its string value.
+ * Used by the selective sharedStrings loader to avoid holding the full XML.
+ */
+export function parseSingleSharedString(body: string): string {
+  const clean = body.replace(RPH_RE, '');
+  let text = '';
+  for (const tm of clean.matchAll(T_RE)) {
+    text += decodeXml(tm[1] ?? '');
+  }
+  return text;
+}
+
 // ─── attribute helpers ──────────────────────────────────────────────────────
 
 function attrValue(attrs: string, name: string): string | undefined {

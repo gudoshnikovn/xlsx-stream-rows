@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 
 import {
   XlsFileTooLargeError,
+  openWorkbook,
   openXlsWorkbook,
   streamXlsRows,
 } from '../src/index.js';
@@ -40,6 +41,29 @@ describe('openXlsWorkbook', () => {
     const info = await openXlsWorkbook(asXlsFile(bytes));
     expect(info.format).toBe('xls');
     expect(info.sheetNames).toEqual(['Alpha', 'Beta', 'Gamma']);
+  });
+
+  it('throws XlsFileTooLargeError when file exceeds xlsMaxBytes option', async () => {
+    const bytes = buildXls({ S1: [[1]] });
+    await expect(
+      openXlsWorkbook(asXlsFile(bytes), { xlsMaxBytes: 100 }),
+    ).rejects.toBeInstanceOf(XlsFileTooLargeError);
+  });
+});
+
+describe('openWorkbook — xlsMaxBytes option', () => {
+  it('passes xlsMaxBytes through to the XLS adapter', async () => {
+    const bytes = buildXls({ S1: [[1]] });
+    await expect(
+      openWorkbook(asXlsFile(bytes), { xlsMaxBytes: 100 }),
+    ).rejects.toBeInstanceOf(XlsFileTooLargeError);
+  });
+
+  it('opens an XLS file within a custom xlsMaxBytes limit', async () => {
+    const bytes = buildXls({ Alpha: [[1]], Beta: [[2]] });
+    const info = await openWorkbook(asXlsFile(bytes), { xlsMaxBytes: Infinity });
+    expect(info.format).toBe('xls');
+    expect(info.sheetNames).toEqual(['Alpha', 'Beta']);
   });
 });
 

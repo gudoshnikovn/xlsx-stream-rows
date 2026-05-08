@@ -38,7 +38,7 @@ import {
   resolvePackagePaths,
   resolveWorkbookPath,
 } from '../zip/opcResolver.js';
-import { parseSharedStrings, parseSheets } from './xmlParser.js';
+import { parseSharedStrings, parseSingleSharedString, parseSheets } from './xmlParser.js';
 import { parseDateFormatMask } from './styles.js';
 import { createRowParser } from './rowParser.js';
 import { checkAbort, abortable } from '../utils/abort.js';
@@ -217,19 +217,41 @@ async function* streamXlsxRowsImpl(
     throw new SheetNotFoundError(targetName, sheetNames);
   }
 
-  // Fetch sharedStrings + (optionally) styles in parallel.
-  const sharedStringsPromise = paths.sharedStrings
-    ? loadSharedStrings(file, entryByPath, paths.sharedStrings, opts.sharedStringsMaxBytes)
-    : Promise.resolve<string[]>([]);
   const stylesPromise =
     opts.parseDates && paths.styles
       ? loadDateFormatMask(file, entryByPath, paths.styles)
       : Promise.resolve(new Set<number>());
 
-  const [sharedStrings, dateFormatStyleIds] = await abortable(
-    Promise.all([sharedStringsPromise, stylesPromise]),
-    signal,
-  );
+  let sharedStrings: string[];
+  let dateFormatStyleIds: Set<number>;
+
+  if (paths.sharedStrings !== undefined && opts.maxRows < Number.POSITIVE_INFINITY) {
+    // Two-pass lazy loading: collect only the shared-string indices used by
+    // the first maxRows rows, then load just those entries. Memory is
+    // proportional to the number of rows read, not to sharedStrings size.
+    const neededIndices = await abortable(
+      collectSharedStringIndices(file, sheetEntry, opts.maxRows, signal),
+      signal,
+    );
+    checkAbort(signal);
+    [sharedStrings, dateFormatStyleIds] = await abortable(
+      Promise.all([
+        loadSharedStringsSelective(file, entryByPath, paths.sharedStrings, neededIndices),
+        stylesPromise,
+      ]),
+      signal,
+    );
+  } else {
+    [sharedStrings, dateFormatStyleIds] = await abortable(
+      Promise.all([
+        paths.sharedStrings
+          ? loadSharedStrings(file, entryByPath, paths.sharedStrings, opts.sharedStringsMaxBytes)
+          : Promise.resolve<string[]>([]),
+        stylesPromise,
+      ]),
+      signal,
+    );
+  }
   checkAbort(signal);
 
   const stream = await abortable(openDecompressedStream(file, sheetEntry), signal);
@@ -313,4 +335,268 @@ async function loadDateFormatMask(
   if (entry === undefined) return new Set();
   const xml = await readEntryToString(file, entry, SMALL_PART_LIMIT);
   return parseDateFormatMask(xml);
+}
+
+// ─── lazy sharedStrings helpers ──────────────────────────────────────────────
+
+function ssiLocalName(rawName: string): string {
+  const colon = rawName.indexOf(':');
+  return colon === -1 ? rawName : rawName.slice(colon + 1);
+}
+
+function ssiTagClose(s: string, start: number): number {
+  let q = 0;
+  for (let i = start; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    if (q !== 0) { if (c === q) q = 0; }
+    else if (c === 0x22 || c === 0x27) q = c;
+    else if (c === 0x3e) return i;
+  }
+  return -1;
+}
+
+/**
+ * Pass 1 of the lazy-sharedStrings path: stream the sheet XML and collect the
+ * set of shared-string indices referenced by the first `maxRows` rows.
+ */
+async function collectSharedStringIndices(
+  file: Blob,
+  sheetEntry: ZipEntry,
+  maxRows: number,
+  signal: AbortSignal | undefined,
+): Promise<Set<number>> {
+  const indices = new Set<number>();
+
+  const stream = await abortable(openDecompressedStream(file, sheetEntry), signal);
+  const td = new TextDecoderStream('utf-8') as unknown as ReadableWritablePair<string, Uint8Array>;
+  const reader = stream.pipeThrough(td).getReader();
+
+  let pending = '';
+  let rowsDone = 0;
+  let inRow = false;
+  let isSCell = false;
+  let inV = false;
+  let vText = '';
+
+  function onStart(rawName: string, attrsStr: string, selfClose: boolean): boolean {
+    const name = ssiLocalName(rawName);
+    switch (name) {
+      case 'row':
+        inRow = true;
+        break;
+      case 'c':
+        if (inRow) isSCell = /\bt\s*=\s*["']s["']/.test(attrsStr);
+        break;
+      case 'v':
+        if (isSCell && inRow) { inV = true; vText = ''; }
+        break;
+    }
+    return selfClose ? onEnd(rawName) : false;
+  }
+
+  function onEnd(rawName: string): boolean {
+    const name = ssiLocalName(rawName.trimEnd());
+    switch (name) {
+      case 'row':
+        inRow = false;
+        isSCell = false;
+        rowsDone++;
+        if (rowsDone >= maxRows) return true;
+        break;
+      case 'c':
+        isSCell = false;
+        inV = false;
+        break;
+      case 'v':
+        if (inV) {
+          const idx = Number.parseInt(vText.trim(), 10);
+          if (Number.isFinite(idx)) indices.add(idx);
+          inV = false;
+        }
+        break;
+    }
+    return false;
+  }
+
+  // Returns true when maxRows is reached and further processing can stop.
+  function processChunk(input: string): boolean {
+    const buf = pending + input;
+    const n = buf.length;
+    let i = 0;
+
+    while (i < n) {
+      const lt = buf.indexOf('<', i);
+
+      if (lt === -1) {
+        if (inV) vText += buf.slice(i);
+        pending = '';
+        return false;
+      }
+
+      if (inV && lt > i) vText += buf.slice(i, lt);
+
+      if (lt + 1 >= n) {
+        pending = buf.slice(lt);
+        return false;
+      }
+
+      const c1 = buf.charCodeAt(lt + 1);
+
+      if (c1 === 0x3f /* ? */) {
+        const end = buf.indexOf('?>', lt + 2);
+        if (end === -1) { pending = buf.slice(lt); return false; }
+        i = end + 2;
+        continue;
+      }
+      if (c1 === 0x21 /* ! */) {
+        if (buf.charCodeAt(lt + 2) === 0x2d && buf.charCodeAt(lt + 3) === 0x2d) {
+          const end = buf.indexOf('-->', lt + 4);
+          if (end === -1) { pending = buf.slice(lt); return false; }
+          i = end + 3;
+        } else {
+          const end = buf.indexOf('>', lt + 2);
+          if (end === -1) { pending = buf.slice(lt); return false; }
+          i = end + 1;
+        }
+        continue;
+      }
+
+      const gt = ssiTagClose(buf, lt + 1);
+      if (gt === -1) { pending = buf.slice(lt); return false; }
+
+      const content = buf.slice(lt + 1, gt);
+      let stop = false;
+
+      if (content.charCodeAt(0) === 0x2f) {
+        stop = onEnd(content.slice(1));
+      } else {
+        let body = content;
+        const selfClose = body.charCodeAt(body.length - 1) === 0x2f;
+        if (selfClose) body = body.slice(0, -1).trimEnd();
+        let nameEnd = 0;
+        while (nameEnd < body.length) {
+          const c = body.charCodeAt(nameEnd);
+          if (c <= 0x20 || c === 0x2f) break;
+          nameEnd++;
+        }
+        stop = onStart(body.slice(0, nameEnd), body.slice(nameEnd), selfClose);
+      }
+
+      i = gt + 1;
+      if (stop) { pending = ''; return true; }
+    }
+
+    pending = i < n ? buf.slice(i) : '';
+    return false;
+  }
+
+  try {
+    while (true) {
+      checkAbort(signal);
+      const { done, value } = await abortable(reader.read(), signal);
+      if (done) break;
+      if (processChunk(value)) break;
+    }
+  } finally {
+    try { await reader.cancel(); } catch { /* already closed */ }
+  }
+
+  return indices;
+}
+
+// Regex to find <si> (or <ns:si>) opening and closing tags in sharedStrings.xml.
+const SI_OPEN_RE = /<(?:[a-zA-Z][\w-]*:)?si(?:\s[^>]*|\/?)>/;
+const SI_CLOSE_RE = /<\/(?:[a-zA-Z][\w-]*:)?si>/;
+
+/**
+ * Pass 2 of the lazy-sharedStrings path: stream sharedStrings.xml and keep
+ * only the entries whose indices appear in `needed`. Returns a sparse array
+ * (unneeded indices are `undefined`) so that `sharedStrings[idx] ?? null`
+ * in the row parser continues to work without changes.
+ */
+async function loadSharedStringsSelective(
+  file: Blob,
+  entryByPath: Map<string, ZipEntry>,
+  path: string,
+  needed: Set<number>,
+): Promise<string[]> {
+  const entry = entryByPath.get(path);
+  if (entry === undefined) {
+    throw new InvalidOpcPackageError(`sharedStrings part "${path}" not in archive`);
+  }
+
+  const result: string[] = [];
+  if (needed.size === 0) return result;
+
+  const maxNeeded = Math.max(...needed);
+
+  const stream = await openDecompressedStream(file, entry);
+  const td = new TextDecoderStream('utf-8') as unknown as ReadableWritablePair<string, Uint8Array>;
+  const reader = stream.pipeThrough(td).getReader();
+
+  let buf = '';
+  let siIdx = 0;
+  let inSi = false;
+  let siAccum = '';
+  let done = false;
+
+  function processBuf(): void {
+    while (!done && buf.length > 0) {
+      if (!inSi) {
+        const m = SI_OPEN_RE.exec(buf);
+        if (!m) {
+          // Keep from last '<' to handle tags that span chunk boundaries.
+          const lt = buf.lastIndexOf('<');
+          buf = lt >= 0 ? buf.slice(lt) : '';
+          return;
+        }
+        const selfClose = m[0].endsWith('/>');
+        buf = buf.slice(m.index + m[0].length);
+        if (selfClose) {
+          if (needed.has(siIdx)) result[siIdx] = '';
+          siIdx++;
+          if (siIdx > maxNeeded) done = true;
+        } else {
+          inSi = true;
+          siAccum = '';
+        }
+      } else {
+        const m = SI_CLOSE_RE.exec(buf);
+        if (!m) {
+          // Accumulate all but a trailing window that might hold a partial tag.
+          const lt = buf.lastIndexOf('<');
+          if (lt > 0) {
+            siAccum += buf.slice(0, lt);
+            buf = buf.slice(lt);
+          } else if (lt === -1) {
+            siAccum += buf;
+            buf = '';
+          }
+          // lt === 0: '<' is at the start — keep buf as-is until more data.
+          return;
+        }
+        siAccum += buf.slice(0, m.index);
+        buf = buf.slice(m.index + m[0].length);
+        inSi = false;
+        if (needed.has(siIdx)) result[siIdx] = parseSingleSharedString(siAccum);
+        siIdx++;
+        siAccum = '';
+        if (siIdx > maxNeeded) done = true;
+      }
+    }
+  }
+
+  try {
+    while (true) {
+      const { done: readDone, value } = await reader.read();
+      if (readDone) break;
+      buf += value;
+      processBuf();
+      if (done) break;
+    }
+  } finally {
+    try { await reader.cancel(); } catch { /* already closed */ }
+  }
+
+  return result;
 }

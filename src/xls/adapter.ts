@@ -37,6 +37,14 @@ export interface XlsWorkbookInfo {
   format: 'xls';
 }
 
+/** Options accepted by `openXlsWorkbook`. */
+export interface XlsOpenOptions {
+  /** Hard cap on file size. Default 50 MiB. Set Infinity to disable. */
+  xlsMaxBytes?: number;
+  /** Cancel the operation. */
+  signal?: AbortSignal;
+}
+
 const DEFAULT_XLS_MAX = 50 * 1024 * 1024;
 
 interface ResolvedXlsOptions {
@@ -113,8 +121,11 @@ async function loadWorkbook(file: Blob, opts: ResolvedXlsOptions): Promise<Loade
   return { wb: xlsx.read(buf, { type: 'array', cellDates: opts.parseDates }), xlsx };
 }
 
-export async function openXlsWorkbook(file: File): Promise<XlsWorkbookInfo> {
-  const opts = resolveOptions(undefined);
+export async function openXlsWorkbook(
+  file: File,
+  options?: XlsOpenOptions,
+): Promise<XlsWorkbookInfo> {
+  const opts = resolveOptions(options);
   const { wb } = await loadWorkbook(file, opts);
   return { filename: file.name, sheetNames: [...wb.SheetNames], format: 'xls' };
 }
