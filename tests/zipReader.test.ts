@@ -162,3 +162,49 @@ describe('readEntryToString', () => {
     await expect(readEntryToString(file, entry, 1024)).rejects.toThrow(/exceeds limit/);
   });
 });
+
+describe('readZipEntries — ZIP64 and stored entries edge cases', () => {
+  it('handles stored entries (method 0) with no compression correctly', async () => {
+    const data = utf8('uncompressed data');
+    const zip = await buildZip([{ name: 'plain.txt', data, method: 0 }]);
+    const entries = await readZipEntries(asFile(zip));
+    expect(entries[0]?.method).toBe(0);
+    expect(entries[0]?.compressedSize).toBe(data.byteLength);
+  });
+
+  it('correctly parses standard ZIP entries without ZIP64 extensions', async () => {
+    const zip = await buildZip([
+      { name: 'small.txt', data: utf8('a'), method: 0 },
+      { name: 'compressed.txt', data: utf8('x'.repeat(1000)), method: 8 },
+    ]);
+    const entries = await readZipEntries(asFile(zip));
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.filename).toBe('small.txt');
+    expect(entries[1]?.filename).toBe('compressed.txt');
+  });
+
+  it('rejects ZIP64 files when EOCD signals ZIP64 requirement', async () => {
+    // Already tested in existing tests; this is a duplicate confirmation
+    const zip = await buildZip([{ name: 'a.txt', data: utf8('x'), method: 0 }], {
+      forceZip64: 'totalEntries',
+    });
+    const file = asFile(zip);
+    await expect(readZipEntries(file)).rejects.toBeInstanceOf(Zip64NotSupportedError);
+  });
+
+  it('throws Zip64NotSupportedError when CD entry has ZIP64 sentinel on uncompressedSize (zip/reader.ts:167)', async () => {
+    // Forces 0xFFFFFFFF into the uncompressedSize field of every CD entry.
+    const zip = await buildZip([{ name: 'a.txt', data: utf8('x'), method: 0 }], {
+      forceZip64: 'cdUncompressedSize',
+    });
+    await expect(readZipEntries(asFile(zip))).rejects.toBeInstanceOf(Zip64NotSupportedError);
+  });
+
+  it('throws Zip64NotSupportedError when CD entry has ZIP64 sentinel on localHeaderOffset (zip/reader.ts:168)', async () => {
+    // Forces 0xFFFFFFFF into the localHeaderOffset field of every CD entry.
+    const zip = await buildZip([{ name: 'a.txt', data: utf8('x'), method: 0 }], {
+      forceZip64: 'cdLocalHeaderOffset',
+    });
+    await expect(readZipEntries(asFile(zip))).rejects.toBeInstanceOf(Zip64NotSupportedError);
+  });
+});

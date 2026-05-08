@@ -74,4 +74,49 @@ describe('createCsvParser', () => {
   it('returns no rows for empty input', () => {
     expect(parseAll('')).toEqual([]);
   });
+
+  it('handles AfterQuote state with junk characters after closing quote', () => {
+    // After closing quote, junk is ignored/skipped in lenient parser
+    expect(parseAll('"a"b,c')).toEqual([['a', 'c']]);
+  });
+
+  it('handles empty fields after pushing empty string', () => {
+    // Test parser behavior with consecutive delimiters (empty fields)
+    expect(parseAll('a,,b')).toEqual([['a', '', 'b']]);
+    expect(parseAll('a,,,b')).toEqual([['a', '', '', 'b']]);
+  });
+
+  it('handles delimiter-only rows (all commas, no data)', () => {
+    expect(parseAll(',,,')).toEqual([['', '', '', '']]);
+  });
+
+  // ─── CR at exact chunk boundary (pendingCR = true path) ──────────────────────
+
+  it('correctly handles \\r at the end of a chunk (FieldStart state, parser.ts:104-105)', () => {
+    // The \\r ends the first chunk with no \\n — pendingCR = true is set.
+    // The second chunk starts with \\n (which is consumed by the pendingCR handler).
+    const p = createCsvParser();
+    const first = p.push('row1\r');   // \\r at chunk boundary → pendingCR = true
+    const second = p.push('\nrow2'); // pending \\r consumes the \\n
+    const last = p.end();
+    expect([...first, ...second, ...last]).toEqual([['row1'], ['row2']]);
+  });
+
+  it('\\r at chunk boundary without following \\n (FieldStart, pendingCR then non-LF)', () => {
+    // pendingCR = true, but next chunk starts with something other than \\n
+    const p = createCsvParser();
+    const first = p.push('row1\r');
+    const second = p.push('row2'); // no \\n follows the \\r → row2 is a new row
+    const last = p.end();
+    expect([...first, ...second, ...last]).toEqual([['row1'], ['row2']]);
+  });
+
+  it('correctly handles \\r at end of chunk in AfterQuote state (parser.ts:175-176)', () => {
+    // Quoted field followed by \\r at chunk boundary.
+    const p = createCsvParser();
+    const first = p.push('"val"\r'); // \\r at chunk boundary in AfterQuote state
+    const second = p.push('\nnext'); // \\n consumed by pending CR handler
+    const last = p.end();
+    expect([...first, ...second, ...last]).toEqual([['val'], ['next']]);
+  });
 });

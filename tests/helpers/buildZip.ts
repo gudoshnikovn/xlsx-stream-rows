@@ -23,7 +23,15 @@ export interface EntrySpec {
 
 export interface BuildOptions {
   comment?: Uint8Array;
-  forceZip64?: 'totalEntries' | 'cdSize' | 'cdOffset';
+  /**
+   * Force ZIP64 0xFFFFFFFF sentinel values into specific fields:
+   *   - 'totalEntries'        — EOCD total-entries field
+   *   - 'cdSize'             — EOCD central-directory size field
+   *   - 'cdOffset'           — EOCD central-directory offset field
+   *   - 'cdUncompressedSize' — uncompressedSize field inside every CD entry
+   *   - 'cdLocalHeaderOffset'— localHeaderOffset field inside every CD entry
+   */
+  forceZip64?: 'totalEntries' | 'cdSize' | 'cdOffset' | 'cdUncompressedSize' | 'cdLocalHeaderOffset';
   corruptLfh?: number; // entry index whose LFH signature should be smashed
 }
 
@@ -146,14 +154,14 @@ export async function buildZip(
     writeU16(view, cdPos + 14, 0); // mod date
     writeU32(view, cdPos + 16, 0); // crc32
     writeU32(view, cdPos + 20, e.compressedSize);
-    writeU32(view, cdPos + 24, e.uncompressedSize);
+    writeU32(view, cdPos + 24, options.forceZip64 === 'cdUncompressedSize' ? 0xffffffff : e.uncompressedSize);
     writeU16(view, cdPos + 28, nameBytes.byteLength);
     writeU16(view, cdPos + 30, 0); // extra length
     writeU16(view, cdPos + 32, 0); // comment length
     writeU16(view, cdPos + 34, 0); // disk number
     writeU16(view, cdPos + 36, 0); // internal attrs
     writeU32(view, cdPos + 38, 0); // external attrs
-    writeU32(view, cdPos + 42, e.localHeaderOffset);
+    writeU32(view, cdPos + 42, options.forceZip64 === 'cdLocalHeaderOffset' ? 0xffffffff : e.localHeaderOffset);
     buf.set(nameBytes, cdPos + 46);
     cdPos += 46 + nameBytes.byteLength;
   }

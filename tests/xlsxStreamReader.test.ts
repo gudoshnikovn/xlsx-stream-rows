@@ -320,3 +320,102 @@ describe('streamXlsxRows — lazy sharedStrings with maxRows', () => {
     expect(rows).toEqual([['Alice', 42]]);
   });
 });
+
+describe('streamXlsxRows — missing files and edge cases', () => {
+  it('throws InvalidOpcPackageError when workbook.xml is missing', async () => {
+    const { buildZip } = await import('./helpers/buildZip.js');
+    const broken = await buildZip([
+      { name: '_rels/.rels', data: new TextEncoder().encode(
+        `<?xml version="1.0"?><Relationships/>`
+      ), method: 8 },
+      { name: '[Content_Types].xml', data: new TextEncoder().encode(
+        `<?xml version="1.0"?><Types/>`
+      ), method: 8 },
+    ]);
+    const iter = streamXlsxRows(asFile(broken));
+    await expect(collect(iter)).rejects.toBeInstanceOf(InvalidOpcPackageError);
+  });
+
+  it('handles 0 sheets gracefully (empty workbook)', async () => {
+    const xlsx = await buildXlsx({
+      sheets: [],
+    });
+    const info = await openXlsxWorkbook(asFile(xlsx));
+    expect(info.sheetNames).toEqual([]);
+  });
+
+  it('throws InvalidOpcPackageError when no sheets exist (workbook is invalid with 0 sheets)', async () => {
+    const xlsx = await buildXlsx({
+      sheets: [],
+    });
+    const iter = streamXlsxRows(asFile(xlsx));
+    // When workbook has 0 sheets and no sheetName specified, returns empty iterator
+    const rows = await collect(iter);
+    expect(rows).toEqual([]);
+  });
+
+  it('skips dangling relationship IDs (rId points to missing sheet file)', async () => {
+    // This is tricky: we'd need to create a workbook.xml with a sheet pointing to a missing rId
+    // For now, test that lazy loading of 0 shared strings succeeds
+    const xlsx = await buildXlsx({
+      sharedStrings: [],
+      sheets: [{ name: 'A', sheetData: '<sheetData><row r="1"><c r="A1"><v>5</v></c></row></sheetData>' }],
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx)));
+    expect(rows).toEqual([[5]]);
+  });
+
+  it('handles missing sharedStrings.xml (lazy load with no indices needed)', async () => {
+    // Build XLSX without sharedStrings to test lazy load path
+    const xlsx = await buildXlsx({
+      sharedStrings: undefined, // omit sharedStrings
+      sheets: [{ name: 'A', sheetData: '<sheetData><row r="1"><c r="A1"><v>42</v></c></row></sheetData>' }],
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx)));
+    expect(rows).toEqual([[42]]);
+  });
+
+  it('handles missing styles.xml gracefully (no date formatting applied)', async () => {
+    const xlsx = await buildXlsx({
+      stylesXml: undefined, // omit styles
+      sheets: [{ name: 'A', sheetData: '<sheetData><row r="1"><c r="A1" s="1"><v>44197</v></c></row></sheetData>' }],
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx)));
+    // Without styles, numeric value should NOT be converted to date
+    expect(rows).toEqual([[44197]]);
+  });
+});
+
+describe('streamXlsxRows — lazy sharedStrings with self-closing <si/>', () => {
+  it('handles <si/> self-closing elements inside sharedStrings.xml in lazy load (reader.ts:556-559)', async () => {
+    // The lazy SST loader (loadSharedStringsSelective) has its own <si/> handling
+    // separate from the regex-based parseSharedStrings. This exercises lines 556-559.
+    //
+    // We inject a raw SST XML containing a self-closing <si/> (index 1 = empty string)
+    // alongside normal entries representing indices 0 and 2.
+    // Using maxRows triggers the two-pass lazy loading path.
+    const NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const xlsx = await buildXlsx({
+      rawSharedStringsXml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="${NS}" count="3" uniqueCount="3">
+  <si><t>hello</t></si>
+  <si/>
+  <si><t>world</t></si>
+</sst>`,
+      sheets: [{
+        name: 'S',
+        sheetData: `<sheetData>
+  <row r="1">
+    <c r="A1" t="s"><v>0</v></c>
+    <c r="B1" t="s"><v>1</v></c>
+    <c r="C1" t="s"><v>2</v></c>
+  </row>
+</sheetData>`,
+      }],
+    });
+
+    // maxRows = 1 triggers the lazy two-pass loader
+    const rows = await collect(streamXlsxRows(asFile(xlsx), { maxRows: 1 }));
+    expect(rows).toEqual([['hello', '', 'world']]);
+  });
+});

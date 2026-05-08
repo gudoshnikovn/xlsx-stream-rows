@@ -34,4 +34,26 @@ describe('excelSerialToDate', () => {
     // 44197.5 = 2021-01-01 12:00:00 UTC
     expect(excelSerialToDate(44197.5).getTime()).toBe(utc(2021, 1, 1, 12, 0, 0));
   });
+
+  it('maps serial 60 to 1900-02-28 UTC (Excel\'s phantom leap day maps to same as 59)', () => {
+    // The 1900 leap-year bug: serial 60 is the ghost day, treated as 1900-02-29 in Excel
+    // but since 1900 was not a leap year, we should get the same date as serial 59
+    expect(excelSerialToDate(60).getTime()).toBe(utc(1900, 2, 28));
+  });
+
+  it('maps serial 0 to 1899-12-31 UTC (day before 1900-01-01)', () => {
+    expect(excelSerialToDate(0).getTime()).toBe(utc(1899, 12, 31));
+  });
+
+  it('handles fractional time less than 1 day (time-only dates)', () => {
+    // 0.5 = 12:00:00 on 1899-12-31
+    expect(excelSerialToDate(0.5).getTime()).toBe(utc(1899, 12, 31, 12, 0, 0));
+  });
+
+  it('maps very large serials (e.g., serial 2958465 = 9999-12-31)', () => {
+    // Serial 2958465 should be at or near the end of the Excel date range
+    const result = excelSerialToDate(2958465);
+    expect(result.getUTCFullYear()).toBeLessThanOrEqual(9999);
+    expect(result).toBeInstanceOf(Date);
+  });
 });

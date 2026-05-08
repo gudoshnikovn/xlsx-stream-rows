@@ -279,13 +279,13 @@ export function createRowParser(ctx: RowParserContext): RowParser {
       case 'inlineStr':
         return c.inlineText;
       case 'b':
-        return c.valueText === '1' || c.valueText === 'true';
+        return c.valueText === '1' || c.valueText.toLowerCase() === 'true';
       case 'e':
         return c.valueText || null;
       case 'd': {
         // Strict-schema ISO-8601 date string.
         const t = Date.parse(c.valueText);
-        return Number.isNaN(t) ? c.valueText : new Date(t);
+        return Number.isNaN(t) ? null : new Date(t);
       }
       case 'n':
       case '': {

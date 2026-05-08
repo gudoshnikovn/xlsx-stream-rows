@@ -30,6 +30,11 @@ export interface BuildXlsxOptions {
   sheets: BuildXlsxSheet[];
   /** Optional shared-string table. Each entry becomes one `<si><t>…</t></si>`. */
   sharedStrings?: string[];
+  /**
+   * Raw `<sst>` XML override — supersedes `sharedStrings` when provided.
+   * Use to inject self-closing `<si/>` or other non-standard SST shapes.
+   */
+  rawSharedStringsXml?: string;
   /** Optional `<styleSheet>` XML body — provided whole so tests control format codes. */
   stylesXml?: string;
   /** Override workbook part location (default `xl/workbook.xml`). */
@@ -102,7 +107,8 @@ export async function buildXlsx(opts: BuildXlsxOptions): Promise<Uint8Array> {
   const method: 0 | 8 = opts.deflate ? 8 : 0;
 
   const workbookPath = opts.workbookPath ?? 'xl/workbook.xml';
-  const sharedStringsPath = opts.sharedStrings
+  const hasSharedStrings = opts.sharedStrings !== undefined || opts.rawSharedStringsXml !== undefined;
+  const sharedStringsPath = hasSharedStrings
     ? opts.sharedStringsPath ?? 'xl/sharedStrings.xml'
     : undefined;
   const stylesPath = opts.stylesXml
@@ -186,12 +192,14 @@ export async function buildXlsx(opts: BuildXlsxOptions): Promise<Uint8Array> {
 </Relationships>`;
 
   // ─── sharedStrings.xml ────────────────────────────────────────────────────
-  const sharedStringsXml = opts.sharedStrings
-    ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  const sharedStringsXml = opts.rawSharedStringsXml
+    ? opts.rawSharedStringsXml
+    : opts.sharedStrings
+      ? `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="${ssNs}" count="${opts.sharedStrings.length}" uniqueCount="${opts.sharedStrings.length}">
 ${opts.sharedStrings.map((s) => `  <si><t>${xmlEscape(s)}</t></si>`).join('\n')}
 </sst>`
-    : undefined;
+      : undefined;
 
   // ─── sheet parts ──────────────────────────────────────────────────────────
   const sheetXmls = sheetMeta.map(

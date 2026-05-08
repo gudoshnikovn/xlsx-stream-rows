@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 
 import {
+  SheetNotFoundError,
   XlsFileTooLargeError,
   openWorkbook,
   openXlsWorkbook,
@@ -103,6 +104,35 @@ describe('streamXlsRows', () => {
     await expect(
       collect(streamXlsRows(asXlsFile(bytes), { xlsMaxBytes: 100 })),
     ).rejects.toBeInstanceOf(XlsFileTooLargeError);
+  });
+
+  it('throws SheetNotFoundError when the requested sheet does not exist (adapter.ts:155)', async () => {
+    // Exercises line 155: sheet is looked up by name but not found in the workbook
+    const bytes = buildXls({ Alpha: [['data']], Beta: [['other']] });
+    await expect(
+      collect(streamXlsRows(asXlsFile(bytes), { sheetName: 'NoSuchSheet' })),
+    ).rejects.toBeInstanceOf(SheetNotFoundError);
+  });
+
+  it('normalises exotic cell values to strings via String(v) fallback (adapter.ts:191)', async () => {
+    // The xlsx library can return objects for certain cell types that don't map
+    // to null / string / number / boolean / Date — triggering the String(v) fallback.
+    // We inject a worksheet where A1 has a custom object value.
+    const wb = XLSX.utils.book_new();
+    const ws: XLSX.WorkSheet = {
+      '!ref': 'A1:B1',
+      // A1: a plain number (covers the number branch)
+      A1: { t: 'n', v: 1 },
+      // B1: a cell whose value is a plain object — normaliseCell hits String(v)
+      B1: { t: 'n', v: { toString: () => 'exotic' } as unknown as number },
+    };
+    XLSX.utils.book_append_sheet(wb, ws, 'S1');
+    const out = XLSX.write(wb, { bookType: 'xls', type: 'array' }) as ArrayBuffer;
+    const bytes = new Uint8Array(out);
+    const rows = await collect(streamXlsRows(asXlsFile(bytes)));
+    // Row must be returned; exact value depends on how xlsx serialises the object
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveLength(2);
   });
 
   it('returns Date objects for date-typed cells when parseDates=true', async () => {

@@ -48,7 +48,7 @@ export function extractSheetNames(workbookXml: string): string[] {
 // ─── sharedStrings.xml — global string-deduplication table ──────────────────
 
 const SI_RE = new RegExp(
-  `<${PREFIX}si\\b[^>]*>([\\s\\S]*?)</${PREFIX}si>`,
+  `<${PREFIX}si\\b[^>]*\\s*/>|<${PREFIX}si\\b[^>]*>([\\s\\S]*?)</${PREFIX}si>`,
   'g',
 );
 const RPH_RE = new RegExp(

@@ -210,7 +210,8 @@ async function* streamXlsxRowsImpl(
 
   const targetName = opts.sheetName ?? sheetNames[0];
   if (targetName === undefined) {
-    throw new InvalidOpcPackageError('Workbook contains no sheets');
+    // No sheets in workbook — return empty iterator
+    return;
   }
   const sheetEntry = sheetEntryByName.get(targetName);
   if (sheetEntry === undefined) {

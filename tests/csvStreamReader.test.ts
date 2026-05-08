@@ -79,4 +79,55 @@ describe('streamCsvRows', () => {
       collect(streamCsvRows(csvFile('a\nb\nc\n'), { signal: ac.signal })),
     ).rejects.toBe(reason);
   });
+
+  it('strips a UTF-16 BE BOM and decodes content', async () => {
+    // UTF-16 BE BOM + "ab\n"
+    const bytes = new Uint8Array([
+      0xfe, 0xff,
+      0x00, 'a'.charCodeAt(0),
+      0x00, 'b'.charCodeAt(0),
+      0x00, 0x0a,
+    ]);
+    const rows = await collect(streamCsvRows(csvFile(bytes)));
+    expect(rows).toEqual([['ab']]);
+  });
+
+  it('handles completely empty file (0 bytes)', async () => {
+    const rows = await collect(streamCsvRows(csvFile('')));
+    expect(rows).toEqual([]);
+  });
+
+  it('handles file with only BOM (UTF-8 BOM, no content)', async () => {
+    const bytes = new Uint8Array([0xef, 0xbb, 0xbf]); // UTF-8 BOM only
+    const rows = await collect(streamCsvRows(csvFile(bytes)));
+    expect(rows).toEqual([]);
+  });
+
+  it('respects csvEncoding option for custom encoding (passthrough to handler)', async () => {
+    // This tests that the encoding option is accepted and passed through
+    const rows = await collect(
+      streamCsvRows(csvFile('a,b\n1,2\n'), { csvEncoding: 'utf-8' }),
+    );
+    expect(rows).toEqual([['a', 'b'], ['1', '2']]);
+  });
+
+  // ─── parser.end() flush path (csv/reader.ts:122-124) ─────────────────────────
+
+  it('yields the last row when file has no trailing newline (reader.ts:122)', async () => {
+    // A file without a trailing \\n causes the stream to reach `done=true` while
+    // parser.end() still has a pending row — exercises the flush loop at line 122.
+    const rows = await collect(streamCsvRows(csvFile('a,b\n1,2')));
+    expect(rows).toEqual([['a', 'b'], ['1', '2']]);
+  });
+
+  it('respects maxRows when last row comes from parser.end() flush (reader.ts:124)', async () => {
+    // Three data lines, no trailing newline, maxRows=3.
+    // Lines 1-2 are emitted during normal streaming; line 3 is flushed by
+    // parser.end() at EOF. When yielded reaches maxRows inside the end() loop,
+    // the early-return at line 124 fires.
+    const rows = await collect(
+      streamCsvRows(csvFile('row1\nrow2\nrow3'), { maxRows: 3 }),
+    );
+    expect(rows.map((r) => r[0])).toEqual(['row1', 'row2', 'row3']);
+  });
 });

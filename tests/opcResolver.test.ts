@@ -117,4 +117,81 @@ describe('resolvePackagePaths', () => {
     expect(paths?.sheetByRId.size).toBe(1);
     expect(paths?.sheetByRId.has('rIdGhost')).toBe(false);
   });
+
+  it('normalizes ./ segments in paths (self-reference)', () => {
+    const paths = resolvePackagePaths(
+      rootRels('/xl/workbook.xml'),
+      workbookXml(['rId1']),
+      workbookRels([
+        { id: 'rId1', type: 'worksheet', target: './worksheets/sheet1.xml' },
+        { id: 'rId2', type: 'sharedStrings', target: './sharedStrings.xml' },
+      ]),
+    );
+    // Paths should normalize ./ to empty
+    expect(paths?.sheetByRId.get('rId1')).toBe('xl/worksheets/sheet1.xml');
+    expect(paths?.sharedStrings).toBe('xl/sharedStrings.xml');
+  });
+
+  it('normalizes .. segments in paths (parent directory references)', () => {
+    const paths = resolvePackagePaths(
+      rootRels('/xl/workbook.xml'),
+      workbookXml(['rId1']),
+      workbookRels([
+        { id: 'rId1', type: 'worksheet', target: 'worksheets/../worksheets/sheet1.xml' },
+        { id: 'rId2', type: 'sharedStrings', target: '../xl/sharedStrings.xml' },
+      ]),
+    );
+    // Paths should normalize .. segments
+    expect(paths?.sheetByRId.get('rId1')).toBe('xl/worksheets/sheet1.xml');
+    expect(paths?.sharedStrings).toBe('xl/sharedStrings.xml');
+  });
+
+  it('handles external relationships in workbook.rels (skips them)', () => {
+    const paths = resolvePackagePaths(
+      rootRels('/xl/workbook.xml'),
+      workbookXml(['rId1']),
+      workbookRels([
+        { id: 'rId1', type: 'worksheet', target: 'worksheets/sheet1.xml' },
+        {
+          id: 'rId99',
+          type: 'hyperlink',
+          target: 'https://example.com',
+        },
+      ]),
+    );
+    // External relationships should not be resolved into packagePaths
+    expect(paths?.sheetByRId.get('rId1')).toBe('xl/worksheets/sheet1.xml');
+    expect(paths?.sheetByRId.has('rId99')).toBe(false);
+  });
+
+  it('resolves 0-sheet workbooks (no worksheets declared)', () => {
+    const paths = resolvePackagePaths(
+      rootRels('/xl/workbook.xml'),
+      workbookXml([]), // empty sheet list
+      workbookRels([
+        { id: 'rId1', type: 'sharedStrings', target: 'sharedStrings.xml' },
+      ]),
+    );
+    expect(paths).toBeDefined();
+    expect(paths?.sheetByRId.size).toBe(0);
+    expect(paths?.sharedStrings).toBe('xl/sharedStrings.xml');
+  });
+
+  it('resolves workbook where <sheet> uses bare id attribute without namespace prefix (opcResolver.ts:206-207)', () => {
+    // Some non-Microsoft producers emit `id=` instead of `r:id=`.
+    // This exercises the bare-id fallback inside collectSheetRIds.
+    const bareIdWorkbookXml = `<workbook>
+  <sheets>
+    <sheet name="Sheet1" sheetId="1" id="rId1"/>
+  </sheets>
+</workbook>`;
+    const paths = resolvePackagePaths(
+      rootRels('/xl/workbook.xml'),
+      bareIdWorkbookXml,
+      workbookRels([
+        { id: 'rId1', type: 'worksheet', target: 'worksheets/sheet1.xml' },
+      ]),
+    );
+    expect(paths?.sheetByRId.get('rId1')).toBe('xl/worksheets/sheet1.xml');
+  });
 });

@@ -168,4 +168,129 @@ describe('createRowParser — single-chunk parsing', () => {
     expect(rows[0]).toEqual([1]);
     expect(rows[99]).toEqual([100]);
   });
+
+  // Cell type coverage: t="str" (formula cached string)
+  it('parses a formula cell with t="str" as string (Excel 2007+ formula result cache)', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="str"><f>CONCATENATE("Hello"," ","World")</f><v>Hello World</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([['Hello World']]);
+  });
+
+  // Cell type coverage: t="n" (explicit numeric)
+  it('parses an explicit numeric cell with t="n"', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="n"><v>3.14159</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[3.14159]]);
+  });
+
+  // Cell type coverage: t="n" with scientific notation
+  it('parses numeric cell with scientific notation (t="n")', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="n"><v>1.23e-4</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[0.000123]]);
+  });
+
+  // Cell type coverage: t="n" with negative number
+  it('parses negative numeric cell (t="n")', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="n"><v>-42.5</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[-42.5]]);
+  });
+
+  // Cell type coverage: t="d" (strict date) with invalid ISO string
+  it('returns null for t="d" with invalid ISO date string', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="d"><v>not-a-date</v></c>
+    </row></sheetData>`;
+    // Invalid date strings return null in strict mode
+    expect(parseAll(xml)).toEqual([[null]]);
+  });
+
+  // Cell type coverage: t="d" (strict date) edge case - midnight UTC
+  it('parses t="d" date at midnight UTC correctly', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="d"><v>2021-12-31T00:00:00Z</v></c>
+    </row></sheetData>`;
+    const rows = parseAll(xml);
+    expect(rows[0]?.[0]).toBeInstanceOf(Date);
+    expect((rows[0]?.[0] as Date).toISOString()).toBe('2021-12-31T00:00:00.000Z');
+  });
+
+  // Cell type coverage: t="e" (error cell) with #N/A
+  it('parses t="e" error cell with #N/A', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="e"><v>#N/A</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([['#N/A']]);
+  });
+
+  // Cell type coverage: t="e" (error cell) with #REF!
+  it('parses t="e" error cell with #REF!', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="e"><v>#REF!</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([['#REF!']]);
+  });
+
+  // Cell type coverage: t="b" with "1" (true)
+  it('parses t="b" boolean with "1" (true)', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="b"><v>1</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[true]]);
+  });
+
+  // Cell type coverage: t="b" with "0" (false)
+  it('parses t="b" boolean with "0" (false)', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="b"><v>0</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[false]]);
+  });
+
+  // Cell type coverage: t="b" case sensitivity - uppercase "TRUE" should return true (case-insensitive)
+  it('treats t="b" with uppercase "TRUE" as true (case-insensitive)', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="b"><v>TRUE</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[true]]);
+  });
+
+  // Cell type coverage: no type attribute (default numeric)
+  it('defaults to numeric when no t= attribute present', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1"><v>123</v></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[123]]);
+  });
+
+  // Cell type coverage: styleIdx s="0" with date format (0 is valid styleId)
+  it('applies date formatting with s="0" when styleId 0 is marked as date format', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" s="0"><v>44197</v></c>
+    </row></sheetData>`;
+    const rows = parseAll(xml, ctx({ dateFormatStyleIds: new Set([0]) }));
+    expect(rows[0]?.[0]).toBeInstanceOf(Date);
+    expect((rows[0]?.[0] as Date).getTime()).toBe(Date.UTC(2021, 0, 1));
+  });
+
+  // Cell type coverage: formula cell with t="str" and empty <v>
+  it('handles formula with t="str" and missing <v> (empty cached result)', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="str"><f>CONCATENATE("a","b")</f></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[null]]);
+  });
+
+  // Cell type coverage: numeric cell without <v>
+  it('returns null for cell with no <v> element', () => {
+    const xml = `<sheetData><row r="1">
+      <c r="A1" t="n"></c>
+    </row></sheetData>`;
+    expect(parseAll(xml)).toEqual([[null]]);
+  });
 });
