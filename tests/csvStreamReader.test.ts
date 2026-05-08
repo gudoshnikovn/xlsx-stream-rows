@@ -106,7 +106,7 @@ describe('streamCsvRows', () => {
   it('respects csvEncoding option for custom encoding (passthrough to handler)', async () => {
     // This tests that the encoding option is accepted and passed through
     const rows = await collect(
-      streamCsvRows(csvFile('a,b\n1,2\n'), { csvEncoding: 'utf-8' }),
+      streamCsvRows(csvFile('a,b\n1,2\n'), { encoding: 'utf-8' }),
     );
     expect(rows).toEqual([['a', 'b'], ['1', '2']]);
   });

@@ -368,7 +368,6 @@ describe('streamXlsxRows — missing files and edge cases', () => {
   it('handles missing sharedStrings.xml (lazy load with no indices needed)', async () => {
     // Build XLSX without sharedStrings to test lazy load path
     const xlsx = await buildXlsx({
-      sharedStrings: undefined, // omit sharedStrings
       sheets: [{ name: 'A', sheetData: '<sheetData><row r="1"><c r="A1"><v>42</v></c></row></sheetData>' }],
     });
     const rows = await collect(streamXlsxRows(asFile(xlsx)));
@@ -377,7 +376,6 @@ describe('streamXlsxRows — missing files and edge cases', () => {
 
   it('handles missing styles.xml gracefully (no date formatting applied)', async () => {
     const xlsx = await buildXlsx({
-      stylesXml: undefined, // omit styles
       sheets: [{ name: 'A', sheetData: '<sheetData><row r="1"><c r="A1" s="1"><v>44197</v></c></row></sheetData>' }],
     });
     const rows = await collect(streamXlsxRows(asFile(xlsx)));
