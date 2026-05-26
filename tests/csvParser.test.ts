@@ -120,3 +120,28 @@ describe('createCsvParser', () => {
     expect([...first, ...second, ...last]).toEqual([['val'], ['next']]);
   });
 });
+
+describe('createCsvParser — custom separator', () => {
+  function parseWith(sep: string, input: string): string[][] {
+    const p = createCsvParser(sep);
+    const rows = p.push(input);
+    rows.push(...p.end());
+    return rows;
+  }
+
+  it('parses tab-separated values', () => {
+    expect(parseWith('\t', 'a\tb\tc')).toEqual([['a', 'b', 'c']]);
+  });
+
+  it('parses semicolon-separated values', () => {
+    expect(parseWith(';', 'a;b;c\n1;2;3')).toEqual([['a', 'b', 'c'], ['1', '2', '3']]);
+  });
+
+  it('treats comma as a literal when separator is tab', () => {
+    expect(parseWith('\t', 'a,b\tc')).toEqual([['a,b', 'c']]);
+  });
+
+  it('handles quoted fields with custom separator', () => {
+    expect(parseWith('\t', '"hello\tworld"\tbye')).toEqual([['hello\tworld', 'bye']]);
+  });
+});

@@ -40,10 +40,15 @@ export interface ReadOptions {
   /** XLS-only: cap on the file size loaded into memory. Default 50 MiB. */
   xlsMaxBytes?: number;
   /**
-   * CSV-only: explicit text encoding (e.g. `'windows-1251'`). UTF-8 / UTF-16
+   * CSV/TSV-only: explicit text encoding (e.g. `'windows-1251'`). UTF-8 / UTF-16
    * BOMs are auto-detected and override this. Default `'utf-8'`.
    */
   csvEncoding?: string;
+  /**
+   * CSV/TSV-only: field separator character. Defaults to `'\t'` for `.tsv`
+   * files, `','` for everything else. Pass any single character to override.
+   */
+  separator?: string;
   /** Cancel the read at any point. Aborting before the first row works. */
   signal?: AbortSignal;
 }
@@ -123,6 +128,7 @@ async function* dispatch(
       const csvOpts: Parameters<typeof streamCsvRows>[1] = {};
       if (o.maxRows !== undefined) csvOpts.maxRows = o.maxRows;
       if (o.csvEncoding !== undefined) csvOpts.encoding = o.csvEncoding;
+      if (o.separator !== undefined) csvOpts.separator = o.separator;
       if (o.signal !== undefined) csvOpts.signal = o.signal;
       inner = streamCsvRows(file, csvOpts);
       break;

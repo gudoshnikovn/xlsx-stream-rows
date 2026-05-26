@@ -131,3 +131,28 @@ describe('streamCsvRows', () => {
     expect(rows.map((r) => r[0])).toEqual(['row1', 'row2', 'row3']);
   });
 });
+
+describe('streamCsvRows — separator', () => {
+  it('uses tab separator for .tsv files by default', async () => {
+    const file = new File(['a\tb\tc\n1\t2\t3\n'], 'data.tsv');
+    const rows = await collect(streamCsvRows(file));
+    expect(rows).toEqual([['a', 'b', 'c'], ['1', '2', '3']]);
+  });
+
+  it('uses comma separator for .csv files by default', async () => {
+    const rows = await collect(streamCsvRows(csvFile('a,b,c\n1,2,3\n')));
+    expect(rows).toEqual([['a', 'b', 'c'], ['1', '2', '3']]);
+  });
+
+  it('explicit separator overrides extension default', async () => {
+    const file = new File(['a;b;c\n1;2;3\n'], 'data.csv');
+    const rows = await collect(streamCsvRows(file, { separator: ';' }));
+    expect(rows).toEqual([['a', 'b', 'c'], ['1', '2', '3']]);
+  });
+
+  it('explicit separator overrides .tsv default', async () => {
+    const file = new File(['a,b,c\n1,2,3\n'], 'data.tsv');
+    const rows = await collect(streamCsvRows(file, { separator: ',' }));
+    expect(rows).toEqual([['a', 'b', 'c'], ['1', '2', '3']]);
+  });
+});

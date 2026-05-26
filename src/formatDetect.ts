@@ -49,6 +49,7 @@ export async function detectFormat(file: File): Promise<SpreadsheetFormat> {
     case 'xls':
       return 'xls';
     case 'csv':
+    case 'tsv':
     case '':
       return 'csv';
     default:

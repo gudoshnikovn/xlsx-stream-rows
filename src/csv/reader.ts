@@ -19,6 +19,11 @@ export interface CsvStreamOptions {
    * BOMs are auto-detected and override this option.
    */
   encoding?: string;
+  /**
+   * Field separator character. Defaults to `'\t'` for `.tsv` files, `','`
+   * for everything else. Pass any single character to override.
+   */
+  separator?: string;
   signal?: AbortSignal;
 }
 
@@ -31,6 +36,7 @@ export interface CsvWorkbookInfo {
 interface ResolvedCsvOptions {
   maxRows: number;
   encoding: string;
+  separator: string | undefined;
   signal: AbortSignal | undefined;
 }
 
@@ -38,8 +44,15 @@ function resolveOptions(o: CsvStreamOptions | undefined): ResolvedCsvOptions {
   return {
     maxRows: o?.maxRows ?? Number.POSITIVE_INFINITY,
     encoding: o?.encoding ?? 'utf-8',
+    separator: o?.separator,
     signal: o?.signal,
   };
+}
+
+function separatorForFile(file: File, explicit: string | undefined): string {
+  if (explicit !== undefined) return explicit;
+  const ext = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase();
+  return ext === 'tsv' ? '\t' : ',';
 }
 
 interface BomDetect {
@@ -110,7 +123,7 @@ async function* streamCsvRowsImpl(
     Uint8Array
   >;
   const reader = bytes.stream().pipeThrough(td).getReader();
-  const parser = createCsvParser();
+  const parser = createCsvParser(separatorForFile(file, opts.separator));
 
   let yielded = 0;
 

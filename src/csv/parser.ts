@@ -47,11 +47,11 @@ const enum State {
 }
 
 const CC_QUOTE = 0x22;
-const CC_COMMA = 0x2c;
 const CC_CR = 0x0d;
 const CC_LF = 0x0a;
 
-export function createCsvParser(): CsvParser {
+export function createCsvParser(separator = ','): CsvParser {
+  const CC_SEP = separator.charCodeAt(0);
   let state: State = State.FieldStart;
   let field = '';
   let row: string[] = [];
@@ -90,7 +90,7 @@ export function createCsvParser(): CsvParser {
           if (c === CC_QUOTE) {
             state = State.Quoted;
             i++;
-          } else if (c === CC_COMMA) {
+          } else if (c === CC_SEP) {
             endField();
             i++;
           } else if (c === CC_LF) {
@@ -114,7 +114,7 @@ export function createCsvParser(): CsvParser {
           let j = i;
           while (j < n) {
             const c = buf.charCodeAt(j);
-            if (c === CC_COMMA || c === CC_CR || c === CC_LF) break;
+            if (c === CC_SEP || c === CC_CR || c === CC_LF) break;
             j++;
           }
           if (j > i) {
@@ -123,7 +123,7 @@ export function createCsvParser(): CsvParser {
           }
           if (i >= n) return; // wait for more
           const c = buf.charCodeAt(i);
-          if (c === CC_COMMA) {
+          if (c === CC_SEP) {
             endField();
             i++;
           } else if (c === CC_LF) {
@@ -161,7 +161,7 @@ export function createCsvParser(): CsvParser {
             field += '"';
             state = State.Quoted;
             i++;
-          } else if (c === CC_COMMA) {
+          } else if (c === CC_SEP) {
             endField();
             i++;
           } else if (c === CC_LF) {

@@ -60,6 +60,10 @@ describe('detectFormat', () => {
   it('falls back to csv for files without any extension', async () => {
     expect(await detectFormat(asNamedFile(utf8('a,b\n1,2'), 'Прайс'))).toBe('csv');
   });
+
+  it('detects .tsv as csv format', async () => {
+    expect(await detectFormat(asNamedFile(utf8('a\tb\n1\t2'), 'data.tsv'))).toBe('csv');
+  });
 });
 
 describe('openWorkbook', () => {
@@ -150,6 +154,18 @@ describe('streamRows / readRows', () => {
   it('passes csvEncoding option through to CSV reader', async () => {
     const rows = await readRows(asNamedFile(utf8('a,b\n1,2\n'), 'd.csv'), {
       csvEncoding: 'utf-8',
+    });
+    expect(rows).toEqual([['a', 'b'], ['1', '2']]);
+  });
+
+  it('reads .tsv file with tab separator by default', async () => {
+    const rows = await readRows(asNamedFile(utf8('a\tb\n1\t2\n'), 'data.tsv'));
+    expect(rows).toEqual([['a', 'b'], ['1', '2']]);
+  });
+
+  it('passes separator option through to CSV reader', async () => {
+    const rows = await readRows(asNamedFile(utf8('a;b\n1;2\n'), 'data.csv'), {
+      separator: ';',
     });
     expect(rows).toEqual([['a', 'b'], ['1', '2']]);
   });
