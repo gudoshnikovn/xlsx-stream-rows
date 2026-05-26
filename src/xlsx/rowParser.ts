@@ -449,6 +449,7 @@ export function createRowParser(ctx: RowParserContext): RowParser {
 
   function end(): Row[] {
     completed = [];
+    if (pending.length > 0) processChunk(pending);
     pending = '';
     const out = completed;
     completed = [];

@@ -3,6 +3,8 @@
  * (fallback). Reads only the first 8 bytes of the file.
  */
 
+import { FormatNotSupportedError } from './errors.js';
+
 export type SpreadsheetFormat = 'xlsx' | 'xls' | 'csv';
 
 const MAGIC_ZIP = [0x50, 0x4b, 0x03, 0x04]; // "PK\x03\x04" — XLSX/XLSM
@@ -25,10 +27,10 @@ function extensionOf(filename: string): string {
  * Detect the format of `file` by:
  *   1. Reading the first 8 bytes and matching against ZIP / OLE2 magic.
  *   2. Falling back to the filename extension when no magic matches.
- *   3. Falling back to `'csv'` when neither path produces a known format.
- *
- * CSV has no binary signature, so it is the natural last resort — consistent
- * with LibreOffice and Apache POI behavior for extension-less files.
+ *   3. Falling back to `'csv'` for files with no extension (extension-less
+ *      plain text is the most plausible ambiguous case).
+ *   4. Throwing `FormatNotSupportedError` when the extension is set but
+ *      unrecognised and no magic bytes matched.
  */
 export async function detectFormat(file: File): Promise<SpreadsheetFormat> {
   if (file.size > 0) {
@@ -39,15 +41,17 @@ export async function detectFormat(file: File): Promise<SpreadsheetFormat> {
     if (startsWith(head, MAGIC_OLE2)) return 'xls';
   }
 
-  switch (extensionOf(file.name)) {
+  const ext = extensionOf(file.name);
+  switch (ext) {
     case 'xlsx':
     case 'xlsm':
       return 'xlsx';
     case 'xls':
       return 'xls';
     case 'csv':
+    case '':
       return 'csv';
     default:
-      return 'csv';
+      throw new FormatNotSupportedError(file.name);
   }
 }

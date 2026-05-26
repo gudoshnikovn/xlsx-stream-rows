@@ -8,4 +8,5 @@ export default defineConfig({
   sourcemap: true,
   target: 'es2022',
   treeshake: true,
+  external: ['xlsx'],
 });

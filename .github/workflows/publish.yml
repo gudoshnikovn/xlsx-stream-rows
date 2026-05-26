@@ -23,7 +23,7 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm test
+        run: npm run typecheck && npm test && npm run test:memory
 
   publish:
     name: Publish to npm

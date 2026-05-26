@@ -2,7 +2,7 @@
 
 **Streaming, chunked, low-memory spreadsheet reader for the browser.** Reads XLSX, CSV, and XLS files row-by-row without loading the entire file into memory — a 1 GB workbook reads in roughly the same memory envelope as a 1 MB one.
 
-Zero runtime dependencies. TypeScript. ESM + CJS. Works in browsers and Web Workers.
+Zero dependencies for XLSX and CSV. TypeScript. ESM + CJS. Works in browsers and Web Workers.
 
 ```sh
 npm install xlsx-stream-rows
@@ -159,11 +159,15 @@ const rows = await readRows(file, { csvEncoding: 'windows-1251' });
 
 ## Format support
 
-| Format | Streaming | Memory peak | Optional dependency |
-|--------|-----------|-------------|---------------------|
-| XLSX / XLSM | yes | ≈ sharedStrings size + few MiB | none |
-| CSV | yes | ≈ one row + decoder window | none |
-| XLS | no — full file load | ≤ `xlsMaxBytes` (default 50 MiB) | `xlsx` peer dep |
+| Format | Streaming | Memory peak | Dependency |
+|--------|-----------|-------------|------------|
+| XLSX / XLSM | ✅ true streaming | ≈ sharedStrings size + few MiB | none — Web APIs only |
+| CSV | ✅ true streaming | ≈ one row + decoder window | none — Web APIs only |
+| XLS | ❌ full file load | ≤ `xlsMaxBytes` (default 50 MiB) | optional `xlsx` peer dep |
+
+**XLSX and CSV require no additional packages** — they use only standard Web Platform APIs (`File`, `Blob`, `DecompressionStream`, `TextDecoderStream`).
+
+**XLS is a legacy binary format** (Microsoft BIFF inside OLE2) that has no streaming primitive. The library loads the entire file into memory and delegates parsing to the optional [`xlsx`](https://sheetjs.com/) peer dependency. XLS support exists to give your code a single unified entry point — `openWorkbook` / `streamRows` — regardless of what file the user hands you. If you know you'll never receive `.xls` files, you don't need the peer dep at all.
 
 Install `xlsx` only if you need XLS support (SheetJS no longer publishes to the npm registry; install from their CDN):
 
@@ -202,7 +206,7 @@ interface ReadOptions {
   signal?: AbortSignal;
 }
 
-function openWorkbook(file: File): Promise<WorkbookInfo>;
+function openWorkbook(file: File, options?: OpenWorkbookOptions): Promise<WorkbookInfo>;
 function streamRows(file: File, options?: ReadOptions): AsyncIterable<Row>;
 function readRows(file: File, options?: ReadOptions): Promise<Row[]>;
 ```
@@ -225,7 +229,7 @@ All errors inherit from `XlsxStreamError` so callers can catch the family with o
 | `EntryTooLargeError` | Bounded entry read exceeded its uncompressed cap |
 | `XlsFileTooLargeError` | XLS file exceeds `xlsMaxBytes` |
 | `XlsxPackageMissingError` | XLS read attempted without the `xlsx` peer dep installed |
-| `FormatNotSupportedError` | Magic + extension both unrecognised |
+| `FormatNotSupportedError` | File extension is set but unrecognised and magic bytes don't match any known format |
 
 Pipeline cancellation (`maxRows` hit, iterator `return()`, `AbortSignal`) is **not** an error — the iterator simply ends, or rejects with `signal.reason`.
 

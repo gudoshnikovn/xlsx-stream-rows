@@ -67,7 +67,8 @@ async function detectBom(file: Blob, fallback: string): Promise<BomDetect> {
   return { encoding: fallback, skip: 0 };
 }
 
-export async function openCsvWorkbook(file: File): Promise<CsvWorkbookInfo> {
+export async function openCsvWorkbook(file: File, signal?: AbortSignal): Promise<CsvWorkbookInfo> {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
   const baseName = file.name.replace(/\.[^./\\]+$/, '');
   return {
     filename: file.name,

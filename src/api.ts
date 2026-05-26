@@ -70,9 +70,9 @@ export async function openWorkbook(
   const format = await detectFormat(file);
   switch (format) {
     case 'xlsx':
-      return openXlsxWorkbook(file);
+      return openXlsxWorkbook(file, options?.signal);
     case 'csv':
-      return openCsvWorkbook(file);
+      return openCsvWorkbook(file, options?.signal);
     case 'xls':
       return openXlsWorkbook(file, options);
   }

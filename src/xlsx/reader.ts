@@ -169,8 +169,11 @@ async function resolvePackage(
  * `_rels/.rels` + workbook part + workbook rels. Total ≈ 100 KiB on a
  * typical workbook regardless of file size.
  */
-export async function openXlsxWorkbook(file: File): Promise<WorkbookInfo> {
-  const { sheetNames } = await resolvePackage(file, undefined);
+export async function openXlsxWorkbook(
+  file: File,
+  signal?: AbortSignal,
+): Promise<WorkbookInfo> {
+  const { sheetNames } = await resolvePackage(file, signal);
   return { filename: file.name, sheetNames, format: 'xlsx' };
 }
 
@@ -529,7 +532,8 @@ async function loadSharedStringsSelective(
   const result: string[] = [];
   if (needed.size === 0) return result;
 
-  const maxNeeded = Math.max(...needed);
+  let maxNeeded = -1;
+  for (const idx of needed) if (idx > maxNeeded) maxNeeded = idx;
 
   const stream = await openDecompressedStream(file, entry);
   const td = new TextDecoderStream('utf-8') as unknown as ReadableWritablePair<string, Uint8Array>;

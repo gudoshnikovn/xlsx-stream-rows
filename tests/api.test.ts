@@ -11,6 +11,7 @@ import {
   openWorkbook,
   readRows,
   streamRows,
+  FormatNotSupportedError,
 } from '../src/index.js';
 import { asFile } from './helpers/buildZip.js';
 import { buildXlsx } from './helpers/buildXlsx.js';
@@ -52,8 +53,8 @@ describe('detectFormat', () => {
     expect(await detectFormat(asNamedFile(new Uint8Array(0), 'empty.xlsx'))).toBe('xlsx');
   });
 
-  it('falls back to csv for unknown extensions and no magic', async () => {
-    expect(await detectFormat(asNamedFile(utf8('x'), 'mystery.dat'))).toBe('csv');
+  it('throws FormatNotSupportedError for unknown extensions with no magic', async () => {
+    await expect(detectFormat(asNamedFile(utf8('x'), 'mystery.dat'))).rejects.toBeInstanceOf(FormatNotSupportedError);
   });
 
   it('falls back to csv for files without any extension', async () => {
