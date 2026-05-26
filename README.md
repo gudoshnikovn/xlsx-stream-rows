@@ -1,6 +1,6 @@
 # xlsx-stream-rows
 
-**Streaming, chunked, low-memory spreadsheet reader for the browser.** Reads XLSX, CSV, and XLS files row-by-row without loading the entire file into memory — a 1 GB workbook reads in roughly the same memory envelope as a 1 MB one.
+**Streaming, chunked, low-memory spreadsheet reader for the browser.** Reads XLSX and CSV files row-by-row without loading the entire file into memory — a 1 GB workbook reads in roughly the same memory envelope as a 1 MB one. XLS is also supported via a unified interface, though it requires a full file load (see [Format support](#format-support)).
 
 Zero dependencies for XLSX and CSV. TypeScript. ESM + CJS. Works in browsers and Web Workers.
 
