@@ -108,13 +108,13 @@ export class XlsFileTooLargeError extends XlsxStreamError {
  * The XLS adapter could not load the optional `xlsx` peer dependency.
  *
  * XLSX and CSV work without `xlsx`. For XLS support, install it:
- *   npm install xlsx
+ *   npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
  */
 export class XlsxPackageMissingError extends XlsxStreamError {
   constructor() {
     super(
       'XLS support requires the optional peer dependency "xlsx". ' +
-        'Install it with `npm install xlsx`.',
+        'Install it with `npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`.',
     );
   }
 }

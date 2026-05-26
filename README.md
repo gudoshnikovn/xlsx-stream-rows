@@ -165,10 +165,10 @@ const rows = await readRows(file, { csvEncoding: 'windows-1251' });
 | CSV | yes | ≈ one row + decoder window | none |
 | XLS | no — full file load | ≤ `xlsMaxBytes` (default 50 MiB) | `xlsx` peer dep |
 
-Install `xlsx` only if you need XLS support:
+Install `xlsx` only if you need XLS support (SheetJS no longer publishes to the npm registry; install from their CDN):
 
 ```sh
-npm install xlsx
+npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
 ```
 
 ---
