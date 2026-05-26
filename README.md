@@ -159,13 +159,24 @@ const rows = await readRows(file, { csvEncoding: 'windows-1251' });
 
 ## Format support
 
-| Format | Streaming | Memory peak | Dependency |
-|--------|-----------|-------------|------------|
-| XLSX / XLSM | ✅ true streaming | ≈ sharedStrings size + few MiB | none — Web APIs only |
-| CSV | ✅ true streaming | ≈ one row + decoder window | none — Web APIs only |
-| XLS | ❌ full file load | ≤ `xlsMaxBytes` (default 50 MiB) | optional `xlsx` peer dep |
+| Extension(s) | Format | Streaming | Memory peak | Dependency |
+|---|---|---|---|---|
+| `.xlsx`, `.xlsm`, `.xltx`, `.xltm` | OOXML (Excel 2007+) | ✅ true streaming | ≈ sharedStrings size + few MiB | none — Web APIs only |
+| `.csv` | CSV (RFC 4180, comma) | ✅ true streaming | ≈ one row + decoder window | none — Web APIs only |
+| `.tsv` | TSV (tab-separated) | ✅ true streaming | ≈ one row + decoder window | none — Web APIs only |
+| `.xls` | Legacy XLS (BIFF/OLE2) | ❌ full file load | ≤ `xlsMaxBytes` (default 50 MiB) | optional `xlsx` peer dep |
 
-**XLSX and CSV require no additional packages** — they use only standard Web Platform APIs (`File`, `Blob`, `DecompressionStream`, `TextDecoderStream`).
+**Format detection** uses ZIP / OLE2 magic bytes first, filename extension as fallback. A file without an extension is treated as CSV. A file with an unrecognised extension throws `FormatNotSupportedError`.
+
+**OOXML variants** (`.xlsm`, `.xltx`, `.xltm`) share the same ZIP + OPC structure as `.xlsx` — the streaming parser handles them identically.
+
+**Encoding** (CSV/TSV): UTF-8 by default. UTF-8 BOM, UTF-16 LE BOM, and UTF-16 BE BOM are auto-detected. Any other encoding (e.g. `'windows-1251'`) can be passed via the `csvEncoding` option — any label recognised by the [WHATWG Encoding Standard](https://encoding.spec.whatwg.org/#names-and-labels) is accepted.
+
+**Custom separator** (CSV/TSV): pass `separator` to override the default (`,` for `.csv`, `\t` for `.tsv`):
+```ts
+// semicolon-separated
+const rows = await readRows(file, { separator: ';' });
+```
 
 **XLS is a legacy binary format** (Microsoft BIFF inside OLE2) that has no streaming primitive. The library loads the entire file into memory and delegates parsing to the optional [`xlsx`](https://sheetjs.com/) peer dependency. XLS support exists to give your code a single unified entry point — `openWorkbook` / `streamRows` — regardless of what file the user hands you. If you know you'll never receive `.xls` files, you don't need the peer dep at all.
 

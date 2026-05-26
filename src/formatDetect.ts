@@ -44,7 +44,9 @@ export async function detectFormat(file: File): Promise<SpreadsheetFormat> {
   const ext = extensionOf(file.name);
   switch (ext) {
     case 'xlsx':
-    case 'xlsm':
+    case 'xlsm': // macro-enabled workbook — same ZIP/OPC structure
+    case 'xltx': // Excel template
+    case 'xltm': // macro-enabled template
       return 'xlsx';
     case 'xls':
       return 'xls';

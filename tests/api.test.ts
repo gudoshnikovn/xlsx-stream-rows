@@ -53,6 +53,18 @@ describe('detectFormat', () => {
     expect(await detectFormat(asNamedFile(new Uint8Array(0), 'empty.xlsx'))).toBe('xlsx');
   });
 
+  it('detects .xlsm as xlsx format', async () => {
+    expect(await detectFormat(asNamedFile(new Uint8Array(0), 'macros.xlsm'))).toBe('xlsx');
+  });
+
+  it('detects .xltx as xlsx format', async () => {
+    expect(await detectFormat(asNamedFile(new Uint8Array(0), 'template.xltx'))).toBe('xlsx');
+  });
+
+  it('detects .xltm as xlsx format', async () => {
+    expect(await detectFormat(asNamedFile(new Uint8Array(0), 'template.xltm'))).toBe('xlsx');
+  });
+
   it('throws FormatNotSupportedError for unknown extensions with no magic', async () => {
     await expect(detectFormat(asNamedFile(utf8('x'), 'mystery.dat'))).rejects.toBeInstanceOf(FormatNotSupportedError);
   });
