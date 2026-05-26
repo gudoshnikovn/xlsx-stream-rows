@@ -132,7 +132,7 @@ describe('streamXlsRows', () => {
     const bytes = new Uint8Array(out);
     const rows = await collect(streamXlsRows(asXlsFile(bytes)));
     expect(rows).toHaveLength(1);
-    expect(rows[0].length).toBeGreaterThanOrEqual(1);
+    expect(rows[0]!.length).toBeGreaterThanOrEqual(1);
   });
 
   it('returns Date objects for date-typed cells when parseDates=true', async () => {
