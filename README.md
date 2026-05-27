@@ -23,7 +23,7 @@ If you've been searching for terms like _streaming xlsx parser_, _chunked spread
 - **True streaming.** `AsyncIterable<Row>` — pull rows on demand, stop whenever. No batch parse, no buffered intermediate result.
 - **Bounded memory.** Peak heap is proportional to the data you consume, not the file size. Measured on a 1,000,000-row XLSX (51 MiB uncompressed sheet, 7.2 MiB on disk): **1.5 MiB peak heap growth**, ~34× smaller than the sheet (`tests/memory.smoke.test.ts`).
 - **Three stop mechanisms, all equivalent.** `maxRows`, `break` out of `for await`, or `AbortSignal`. Pipeline tears down promptly: no further bytes fetched, decompressed, or parsed.
-- **Format coverage.** XLSX (streaming), CSV (streaming), XLS (delegated to optional `xlsx` peer dep, bounded by `xlsMaxBytes`).
+- **Format coverage.** XLSX / XLSM / XLTX / XLTM (streaming), CSV and TSV (streaming, custom separator supported), XLS (delegated to optional `xlsx` peer dep, bounded by `xlsMaxBytes`).
 - **Auto-detect.** ZIP / OLE2 magic-byte sniff with filename extension as fallback.
 - **Standards-grounded.** Every byte offset and XML path traces to [PKWARE APPNOTE.TXT](https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT) (ZIP) or [ECMA-376](https://www.ecma-international.org/publications-and-standards/standards/ecma-376/) (OOXML), not reverse-engineered from other libraries.
 - **OPC-correct.** Resolves package parts via `_rels/.rels` indirection rather than hardcoded paths, so files from LibreOffice, Google Sheets, or custom generators work too.
@@ -94,10 +94,9 @@ The pull-based design makes progress trivial — count rows yourself, or report 
 
 ```ts
 let count = 0;
-const total = info.estimatedRowCount; // your own estimate, e.g. file.size / 100
 for await (const row of streamRows(file)) {
   count++;
-  if (count % 1000 === 0) updateProgress(count, total);
+  if (count % 1000 === 0) updateProgress(count);
   await processRow(row);
 }
 ```
@@ -211,8 +210,10 @@ interface ReadOptions {
   sharedStringsMaxBytes?: number;
   /** XLS only: cap on the file size loaded into memory. Default 50 MiB. */
   xlsMaxBytes?: number;
-  /** CSV only: text encoding. UTF-8/16 BOMs are auto-detected. Default 'utf-8'. */
+  /** CSV/TSV only: text encoding. UTF-8/16 BOMs are auto-detected. Default 'utf-8'. */
   csvEncoding?: string;
+  /** CSV/TSV only: field separator. Default ',' for .csv, '\t' for .tsv. */
+  separator?: string;
   /** Cancel the read at any point — including before the first row is yielded. */
   signal?: AbortSignal;
 }
@@ -255,7 +256,7 @@ XLSX files are ZIP archives of XML parts. The Central Directory at the end of th
 3. Open a `ReadableStream` over the target sheet's compressed bytes (`Blob.slice().stream()`), pipe through `DecompressionStream('deflate-raw')` and `TextDecoderStream`, feed the result to a hand-rolled SAX state machine that emits rows as `</row>` closes.
 4. Cancelling the iterator (`maxRows`, `break`, `AbortSignal`) cancels the reader, which propagates up the pipeline — no more bytes are fetched.
 
-For CSV: same shape, simpler — `file.stream() → TextDecoderStream → RFC-4180 parser`.
+For CSV/TSV: same shape, simpler — `file.stream() → TextDecoderStream → RFC-4180 parser` with a configurable field separator (`,` for CSV, `\t` for TSV, or any custom character).
 
 For XLS: no streaming primitive exists in the BIFF/OLE2 format, so we delegate to the `xlsx` package and bound the file size to keep memory predictable.
 
@@ -266,7 +267,6 @@ For XLS: no streaming primitive exists in the BIFF/OLE2 format, so we delegate t
 - **No ZIP64.** Files with the Central Directory or any individual entry over 4 GiB, or with more than 65,535 entries, are rejected with `Zip64NotSupportedError`. In practice you can comfortably read 5–10 GB of sheet data; multi-GB compressed XLSX with monster sharedStrings tables are the edge case to watch.
 - **No formula evaluation.** Formula cells return the cached `<v>` written by the producer; if absent, `null`. We do not re-evaluate.
 - **No merged-cell expansion.** Cells appear exactly where the XML places them.
-- **CSV is comma-only.** Semicolon and tab dialects are out of scope — preprocess if needed.
 - **No password-protected files.**
 
 ---
@@ -297,7 +297,7 @@ Drop a real spreadsheet in, set `maxRows`, watch it stream.
 
 ```sh
 npm install
-npm test            # Node test suite (≈ 150 tests, including fuzz)
+npm test            # Node test suite (260+ tests, including fuzz)
 npm run test:browser  # same suite in real Chromium / Firefox / WebKit via Playwright
 npm run test:memory   # 1M-row memory smoke (set --pool=forks for forced GC)
 npm run build         # tsup → dist/ (ESM + CJS + d.ts)
