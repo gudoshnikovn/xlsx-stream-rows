@@ -88,17 +88,14 @@ interface XlsxWorkbook {
 
 type XlsxSheet = Record<string, unknown>;
 
-let cachedXlsx: XlsxModule | null = null;
-
 async function loadXlsx(): Promise<XlsxModule> {
-  if (cachedXlsx !== null) return cachedXlsx;
   try {
     // Dynamic import keeps `xlsx` out of the static dep graph for consumers
     // who only need XLSX/CSV. The string literal is intentionally
     // non-resolvable at bundle time; tsup will leave it for the runtime.
+    // Module-level caching is handled by the JS runtime — no manual cache needed.
     const mod = (await import('xlsx')) as unknown as XlsxModule | { default: XlsxModule };
-    cachedXlsx = 'default' in mod ? mod.default : mod;
-    return cachedXlsx;
+    return 'default' in mod ? mod.default : mod;
   } catch {
     throw new XlsxPackageMissingError();
   }

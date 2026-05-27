@@ -240,7 +240,7 @@ async function* streamXlsxRowsImpl(
     checkAbort(signal);
     [sharedStrings, dateFormatStyleIds] = await abortable(
       Promise.all([
-        loadSharedStringsSelective(file, entryByPath, paths.sharedStrings, neededIndices),
+        loadSharedStringsSelective(file, entryByPath, paths.sharedStrings, neededIndices, signal),
         stylesPromise,
       ]),
       signal,
@@ -523,6 +523,7 @@ async function loadSharedStringsSelective(
   entryByPath: Map<string, ZipEntry>,
   path: string,
   needed: Set<number>,
+  signal: AbortSignal | undefined,
 ): Promise<string[]> {
   const entry = entryByPath.get(path);
   if (entry === undefined) {
@@ -593,7 +594,7 @@ async function loadSharedStringsSelective(
 
   try {
     while (true) {
-      const { done: readDone, value } = await reader.read();
+      const { done: readDone, value } = await abortable(reader.read(), signal);
       if (readDone) break;
       buf += value;
       processBuf();
