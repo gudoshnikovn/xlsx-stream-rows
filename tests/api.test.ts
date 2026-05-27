@@ -53,17 +53,6 @@ describe('detectFormat', () => {
     expect(await detectFormat(asNamedFile(new Uint8Array(0), 'empty.xlsx'))).toBe('xlsx');
   });
 
-  it('detects .xlsm as xlsx format', async () => {
-    expect(await detectFormat(asNamedFile(new Uint8Array(0), 'macros.xlsm'))).toBe('xlsx');
-  });
-
-  it('detects .xltx as xlsx format', async () => {
-    expect(await detectFormat(asNamedFile(new Uint8Array(0), 'template.xltx'))).toBe('xlsx');
-  });
-
-  it('detects .xltm as xlsx format', async () => {
-    expect(await detectFormat(asNamedFile(new Uint8Array(0), 'template.xltm'))).toBe('xlsx');
-  });
 
   it('throws FormatNotSupportedError for unknown extensions with no magic', async () => {
     await expect(detectFormat(asNamedFile(utf8('x'), 'mystery.dat'))).rejects.toBeInstanceOf(FormatNotSupportedError);
@@ -100,6 +89,20 @@ describe('openWorkbook', () => {
     expect(info.sheetNames).toEqual(['data']);
   });
 
+  it.each([
+    ['macros.xlsm', 'xlsm'],
+    ['template.xltx', 'xltx'],
+    ['template.xltm', 'xltm'],
+  ])('routes %s to the XLSX adapter', async (filename) => {
+    const bytes = await buildXlsx({
+      sheets: [{ name: 'Data', sheetData: '<sheetData/>' }],
+    });
+    const info = await openWorkbook(asNamedFile(bytes, filename));
+    expect(info.format).toBe('xlsx');
+    expect(info.sheetNames).toEqual(['Data']);
+    expect(info.filename).toBe(filename);
+  });
+
   it('routes XLS files to the XLS adapter', async () => {
     const info = await openWorkbook(asNamedFile(buildXls([[1]]), 'book.xls'));
     expect(info.format).toBe('xls');
@@ -120,6 +123,25 @@ describe('streamRows / readRows', () => {
       ],
     });
     expect(await readRows(asFile(xlsx, 'wb.xlsx'))).toEqual([['Alice', 42]]);
+  });
+
+  it.each([
+    ['macros.xlsm', 'xlsm'],
+    ['template.xltx', 'xltx'],
+    ['template.xltm', 'xltm'],
+  ])('reads rows from %s end-to-end', async (filename) => {
+    const bytes = await buildXlsx({
+      sharedStrings: ['hello'],
+      sheets: [
+        {
+          name: 'Sheet1',
+          sheetData:
+            '<sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>99</v></c></row></sheetData>',
+        },
+      ],
+    });
+    const rows = await readRows(asNamedFile(bytes, filename));
+    expect(rows).toEqual([['hello', 99]]);
   });
 
   it('streams rows from CSV through the unified API', async () => {
