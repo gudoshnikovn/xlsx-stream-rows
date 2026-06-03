@@ -374,6 +374,35 @@ describe('streamXlsxRows — missing files and edge cases', () => {
     expect(rows).toEqual([[42]]);
   });
 
+  it('reads shared strings when ZIP entry is differently-cased than rels reference (e.g. SharedStrings.xml vs sharedStrings.xml)', async () => {
+    const sheetData = `<sheetData>
+      <row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1"><v>1</v></c></row>
+      <row r="2"><c r="A2" t="s"><v>1</v></c><c r="B2"><v>2</v></c></row>
+    </sheetData>`;
+    // rels will reference xl/sharedStrings.xml; ZIP entry will be xl/SharedStrings.xml
+    const xlsx = await buildXlsx({
+      sheets: [{ name: 'Sheet1', sheetData }],
+      sharedStrings: ['hello', 'world'],
+      sharedStringsZipEntryPath: 'xl/SharedStrings.xml',
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx)));
+    expect(rows).toEqual([['hello', 1], ['world', 2]]);
+  });
+
+  it('reads shared strings with mismatched case via lazy load (maxRows path)', async () => {
+    const sheetData = `<sheetData>
+      <row r="1"><c r="A1" t="s"><v>0</v></c></row>
+      <row r="2"><c r="A2" t="s"><v>1</v></c></row>
+    </sheetData>`;
+    const xlsx = await buildXlsx({
+      sheets: [{ name: 'Sheet1', sheetData }],
+      sharedStrings: ['foo', 'bar'],
+      sharedStringsZipEntryPath: 'xl/SharedStrings.xml',
+    });
+    const rows = await collect(streamXlsxRows(asFile(xlsx), { maxRows: 10 }));
+    expect(rows).toEqual([['foo'], ['bar']]);
+  });
+
   it('handles missing styles.xml gracefully (no date formatting applied)', async () => {
     const xlsx = await buildXlsx({
       sheets: [{ name: 'A', sheetData: '<sheetData><row r="1"><c r="A1" s="1"><v>44197</v></c></row></sheetData>' }],

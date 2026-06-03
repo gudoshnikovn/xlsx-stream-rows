@@ -41,6 +41,11 @@ export interface BuildXlsxOptions {
   workbookPath?: string;
   /** Override sharedStrings part location (default `xl/sharedStrings.xml`). */
   sharedStringsPath?: string;
+  /**
+   * Override the ZIP entry name for sharedStrings (default: same as `sharedStringsPath`).
+   * Use to simulate producers that write a differently-cased filename than the rels reference.
+   */
+  sharedStringsZipEntryPath?: string;
   /** Override styles part location (default `xl/styles.xml`). */
   stylesPath?: string;
   /** Override sheet directory (default `xl/worksheets/`). */
@@ -217,7 +222,8 @@ ${s.sheetData}
     { name: relsFor(workbookPath), data: utf8(workbookRels), method },
   ];
   if (sharedStringsPath && sharedStringsXml) {
-    entries.push({ name: sharedStringsPath, data: utf8(sharedStringsXml), method });
+    const zipEntryPath = opts.sharedStringsZipEntryPath ?? sharedStringsPath;
+    entries.push({ name: zipEntryPath, data: utf8(sharedStringsXml), method });
   }
   if (stylesPath && opts.stylesXml) {
     entries.push({ name: stylesPath, data: utf8(opts.stylesXml), method });
