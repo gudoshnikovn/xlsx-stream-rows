@@ -101,7 +101,7 @@ async function resolvePackage(
   checkAbort(signal);
 
   const entryByPath = new Map<string, ZipEntry>();
-  for (const e of entries) entryByPath.set(e.filename, e);
+  for (const e of entries) entryByPath.set(e.filename.toLowerCase(), e);
 
   const rootRelsEntry = entryByPath.get(ROOT_RELS_PATH);
   if (rootRelsEntry === undefined) {
@@ -119,7 +119,7 @@ async function resolvePackage(
       'Root rels has no relationship of type ".../officeDocument" — not an XLSX',
     );
   }
-  const workbookEntry = entryByPath.get(workbookPath);
+  const workbookEntry = entryByPath.get(workbookPath.toLowerCase());
   if (workbookEntry === undefined) {
     throw new InvalidOpcPackageError(
       `Workbook part "${workbookPath}" referenced by rels is not in the archive`,
@@ -127,7 +127,7 @@ async function resolvePackage(
   }
 
   const workbookRelsPath = relsPathFor(workbookPath);
-  const workbookRelsEntry = entryByPath.get(workbookRelsPath);
+  const workbookRelsEntry = entryByPath.get(workbookRelsPath.toLowerCase());
   if (workbookRelsEntry === undefined) {
     throw new InvalidOpcPackageError(`Missing workbook rels at "${workbookRelsPath}"`);
   }
@@ -154,7 +154,7 @@ async function resolvePackage(
     sheetNames.push(sheet.name);
     const partPath = paths.sheetByRId.get(sheet.rId);
     if (partPath === undefined) continue; // dangling rId — skip
-    const entry = entryByPath.get(partPath);
+    const entry = entryByPath.get(partPath.toLowerCase());
     if (entry === undefined) continue;
     sheetEntryByName.set(sheet.name, entry);
   }
@@ -319,7 +319,7 @@ async function loadSharedStrings(
   path: string,
   maxBytes: number,
 ): Promise<string[]> {
-  const entry = entryByPath.get(path);
+  const entry = entryByPath.get(path.toLowerCase());
   if (entry === undefined) return [];
   if (entry.uncompressedSize > maxBytes) {
     throw new SharedStringsTooLargeError(entry.uncompressedSize, maxBytes);
@@ -333,7 +333,7 @@ async function loadDateFormatMask(
   entryByPath: Map<string, ZipEntry>,
   path: string,
 ): Promise<Set<number>> {
-  const entry = entryByPath.get(path);
+  const entry = entryByPath.get(path.toLowerCase());
   if (entry === undefined) return new Set();
   const xml = await readEntryToString(file, entry, SMALL_PART_LIMIT);
   return parseDateFormatMask(xml);
@@ -523,7 +523,7 @@ async function loadSharedStringsSelective(
   needed: Set<number>,
   signal: AbortSignal | undefined,
 ): Promise<string[]> {
-  const entry = entryByPath.get(path);
+  const entry = entryByPath.get(path.toLowerCase());
   if (entry === undefined) return [];
 
   const result: string[] = [];
