@@ -320,9 +320,7 @@ async function loadSharedStrings(
   maxBytes: number,
 ): Promise<string[]> {
   const entry = entryByPath.get(path);
-  if (entry === undefined) {
-    throw new InvalidOpcPackageError(`sharedStrings part "${path}" not in archive`);
-  }
+  if (entry === undefined) return [];
   if (entry.uncompressedSize > maxBytes) {
     throw new SharedStringsTooLargeError(entry.uncompressedSize, maxBytes);
   }
@@ -526,9 +524,7 @@ async function loadSharedStringsSelective(
   signal: AbortSignal | undefined,
 ): Promise<string[]> {
   const entry = entryByPath.get(path);
-  if (entry === undefined) {
-    throw new InvalidOpcPackageError(`sharedStrings part "${path}" not in archive`);
-  }
+  if (entry === undefined) return [];
 
   const result: string[] = [];
   if (needed.size === 0) return result;
